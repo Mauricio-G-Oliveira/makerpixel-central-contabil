@@ -1,8 +1,8 @@
 {
-  "name": "makerpixel-techsystem",
-  "version": "1.0.0",
+  "name": "makerpixel-central-contabil",
+  "version": "2.0.0",
   "private": true,
-  "description": "MakerPixel Techsystem — Gestão Financeira, Inteligência Fiscal & PWA (React + Tailwind)",
+  "description": "Central Contábil by MakerPixel — Plataforma SaaS de Gestão Contábil, Inteligência Fiscal e Busca Automatizada de NFC-e (React + Tailwind)",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

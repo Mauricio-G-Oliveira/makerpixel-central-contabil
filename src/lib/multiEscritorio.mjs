@@ -24,7 +24,7 @@ const ESCRITORIOS_PADRAO = [
     cidade: "Tubarão",
     uf: "SC",
     situacao: "ATIVO", // ATIVO | TESTE | SUSPENSO | ENCERRADO
-    modulos: ["integracao", "conciliacao", "vencimentos", "em-dia", "fiscal", "horas", "lucros"],
+    modulos: ["integracao", "conciliacao", "vencimentos", "em-dia", "fiscal", "horas", "lucros", "notasync"],
     limiteUsuarios: 15,
     limiteEmpresas: 150,
     criadoEm: "2026-01-10T08:00:00Z"
@@ -41,7 +41,7 @@ const ESCRITORIOS_PADRAO = [
     uf: "SC",
     situacao: "TESTE",
     testeExpiraEm: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-    modulos: ["integracao", "conciliacao", "vencimentos", "em-dia", "fiscal", "horas", "lucros"],
+    modulos: ["integracao", "conciliacao", "vencimentos", "em-dia", "fiscal", "horas", "lucros", "notasync"],
     limiteUsuarios: 3,
     limiteEmpresas: 20,
     criadoEm: new Date().toISOString()

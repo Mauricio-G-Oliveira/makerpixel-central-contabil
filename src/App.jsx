@@ -19,6 +19,7 @@ import Iss from "./paginas/Iss.jsx";
 import Icms from "./paginas/Icms.jsx";
 import Horas from "./paginas/Horas.jsx";
 import IbsCbs from "./paginas/IbsCbs.jsx";
+import NotaSync from "./paginas/NotaSync.jsx";
 import AdminMakerPixel from "./paginas/AdminMakerPixel.jsx";
 import { AvisosProvider } from "./componentes/Avisos.jsx";
 import AvisoAtualizacao from "./componentes/AvisoAtualizacao.jsx";
@@ -70,6 +71,7 @@ export default function App() {
             <Route path="icms" element={<SoArea area="mod-icms"><Icms /></SoArea>} />
             <Route path="horas" element={<SoArea area="mod-horas"><Horas /></SoArea>} />
             <Route path="ibs-cbs" element={<SoArea area="mod-ibs-cbs"><IbsCbs /></SoArea>} />
+            <Route path="notasync" element={<SoArea area="mod-notasync"><NotaSync /></SoArea>} />
             {/* o antigo Painel de vencimentos virou Certidões e Alvarás */}
             <Route path="modulo/mod-vencimentos" element={<Navigate to="/departamento-cadastro/certidoes" replace />} />
             <Route path="usuarios" element={<SoAdmin><Usuarios /></SoAdmin>} />

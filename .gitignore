@@ -12,4 +12,8 @@ dist/
 *.csv
 *EXTRATO*.txt
 *.mp4
+!docs/*.mp4
 *.aiff
+*.pfx
+*.p12
+xml-saida/

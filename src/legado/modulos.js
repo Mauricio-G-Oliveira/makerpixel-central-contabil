@@ -32,12 +32,15 @@
     { id: "mod-horas", label: "Controle de horas", pasta: "modulos/controle-horas/", secao: "Departamento Pessoal",
       descricao: "Folhas de presença dos clientes: gerar planilha, importar, conferir horas extras e fechar o mês",
       icone: '<path d="M12 7v5l3 2M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z"/>',
-      botaoTema: "#hr-sem-botao-tema", tema: "data-theme" }
+      botaoTema: "#hr-sem-botao-tema", tema: "data-theme" },
+    { id: "mod-notasync", label: "Notas Fiscais (NotaSync)", pasta: "modulos/notasync/", secao: "Fiscal",
+      descricao: "Buscador automático de NFC-e direto da SEF/SC para contadores",
+      icone: '<path d="M4 4v16h16V4H4zm4 4h8v2H8V8zm0 4h8v2H8v-2zm0 4h5v2H8v-2z"/>' }
   ];
 
   /** Chaves do localStorage que pertencem aos módulos (vão no backup do sistema). */
   // painelVencimentos e depCadastro: Departamento Cadastro (tela em React; o antigo painel saiu)
-  var PREFIXOS_DADOS = ["icms.", "painelVencimentos:", "depCadastro:", "emDia:", "lucros:", "horas:", "iss:"];
+  var PREFIXOS_DADOS = ["icms.", "painelVencimentos:", "depCadastro:", "emDia:", "lucros:", "horas:", "iss:", "notasync:"];
 
   function porId(id) { return LISTA.filter(function (m) { return m.id === id; })[0] || null; }
   function ehDadoDeModulo(chave) { return PREFIXOS_DADOS.some(function (p) { return chave.indexOf(p) === 0; }); }

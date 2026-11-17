@@ -1,7 +1,7 @@
 {
-  "name": "MakerPixel Techsystem",
-  "short_name": "MakerPixel",
-  "description": "Gestão Financeira, Conciliação Bancária, Inteligência Fiscal e Contabilidade.",
+  "name": "Central Contábil · MakerPixel",
+  "short_name": "Central Contábil",
+  "description": "Central Contábil: Plataforma SaaS de Gestão Contábil, Conciliação, Fiscal e NotaSync.",
   "id": "./",
   "start_url": "./",
   "scope": "./",

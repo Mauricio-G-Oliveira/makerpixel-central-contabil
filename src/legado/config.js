@@ -26,7 +26,7 @@ var CONFIG = {
   // Tela Início: false = capa com as ferramentas e mini cards de pendências; true = lista completa de pendências.
   inicioPendencias: false,
   // Endereço da versão HTML (enquanto a migração para React não termina, as telas que faltam apontam para ela).
-  sistemaAnterior: "https://mauricio-g-oliveira.github.io/makerpixel-gestao/",
+  sistemaAnterior: "https://mauricio-g-oliveira.github.io/makerpixel-central-contabil/",
   suporte: { nome: "Mauricio", papel: "TI · desenvolvimento do sistema", whatsapp: "5548991781362" }
 };
 

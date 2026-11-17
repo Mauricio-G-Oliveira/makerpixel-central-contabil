@@ -244,7 +244,7 @@ export function statusTeste(escritorio) {
  * Gera mensagem de convite pronta para WhatsApp ou e-mail.
  */
 export function gerarMensagemConvite(escritorio, senha) {
-  const url = typeof window !== "undefined" ? window.location.origin + window.location.pathname : "https://mauricio-g-oliveira.github.io/makerpixel-gestao/";
+  const url = typeof window !== "undefined" ? window.location.origin + window.location.pathname : "https://mauricio-g-oliveira.github.io/makerpixel-central-contabil/";
   const expiraStr = escritorio.testeExpiraEm ? new Date(escritorio.testeExpiraEm).toLocaleDateString("pt-BR") : "";
 
   return `Olá ${escritorio.contato || escritorio.razaoSocial}!\n\n` +

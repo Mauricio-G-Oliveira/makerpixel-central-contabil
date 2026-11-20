@@ -455,11 +455,13 @@
         itens: ["Situação: pendente, emitido ou entregue", "Progresso do exercício de todas as empresas", "Marca o que não se aplica à empresa"] }
     ] },
     { id: "fiscal", nome: "Fiscal", texto: "Prévia da apuração e conferência das notas antes do fechamento.", ferramentas: [
+      { tab: "notasync", area: "mod-notasync", icone: "notasync", nome: "NotaSync", resumo: "Buscador de NFC-e direto da SEF/SC para contadores.",
+        itens: ["Download automático via Web Service da Fazenda (Boletim 2026/003)", "Deduplicação de chaves e tratamento de eventos de cancelamento", "Sem mensalidade para intermediadores com certificado A1 local"] },
       { tab: "mod-icms", area: "mod-icms", icone: "icms", nome: "Apuração de ICMS", resumo: "Acompanha o ICMS do cliente durante o mês.",
         itens: ["Lê os XMLs de NF-e e NFC-e de entrada e saída", "Débitos, créditos e saldo por CFOP até a data escolhida", "Planilha Excel pronta para conferência"] },
       { tab: "mod-ibs-cbs", area: "mod-ibs-cbs", icone: "ibs", nome: "Auditor IBS/CBS", resumo: "Confere os novos tributos da reforma nas notas.",
         itens: ["CST, cClassTrib, base e alíquotas da LC 214/2025", "Aponta reduções e valores divergentes item a item", "NF-e e NFS-e, calculadora manual e exportação"] },
-      { tab: "mod-iss", area: "mod-iss", icone: "iss", nome: "ISS", resumo: "Conferência das retenções e notas fiscais.",
+      { tab: "mod-iss", area: "mod-iss", icone: "iss", nome: "ISS Municipal", resumo: "Conferência das retenções e notas fiscais.",
         itens: ["Importa o XML do Movimento Econômico de cada empresa", "ISS retido e retenções federais (IR, PIS, COFINS, CSLL, INSS)", "Alertas de alíquota e valores, e Excel por empresa"] }
     ] },
     { id: "pessoal", nome: "Departamento Pessoal", texto: "Folha de ponto dos clientes sem cartão, conferida e calculada.", ferramentas: [
@@ -554,7 +556,7 @@
     }
     if (pode("mod-iss") && ISS) {
       var i = ISS.normalizar(ler(CHAVES.iss));
-      if (!ISS.mesesComDados(i).length) { ISS.exemplo(i, mes); gravar(CHAVES.iss, i); feitos.push("ISS Tubarão"); }
+      if (!ISS.mesesComDados(i).length) { ISS.exemplo(i, mes); gravar(CHAVES.iss, i); feitos.push("ISS Municipal"); }
     }
     if (pode("mod-horas") && HR) {
       var h = HR.normalizar(ler(CHAVES.horas));

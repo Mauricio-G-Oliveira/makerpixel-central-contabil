@@ -6,6 +6,7 @@ import { Modulos } from "./legado.js";
 import { contabil as dados } from "./useContabil.js";
 import { nomeDaFonte } from "./contabil.mjs";
 import { depCadastro } from "./useDepCadastro.js";
+import { escritorioAtivo, podeUsarModulo } from "./multiEscritorio.mjs";
 
 export { MOVIMENTOS, CADASTROS } from "./contabil.mjs";
 import { MOVIMENTOS, CADASTROS } from "./contabil.mjs";
@@ -15,11 +16,15 @@ const ICONE_MODULO = { "mod-icms": "icms", "mod-ibs-cbs": "ibs", "mod-iss": "iss
 
 export const nomeDaConta = nomeDaFonte;
 
-/** Seções do menu para a pessoa logada. pode(area) vem do login. */
+/** Seções do menu para a pessoa logada e escritório ativo. */
 export function montarMenu(pode, ehAdmin) {
-  const modulos = (secao) => Modulos.LISTA.filter((m) => m.secao === secao && pode(m.id))
+  const esc = escritorioAtivo();
+  const moduloLiberado = (mod) => podeUsarModulo(esc, mod);
+
+  const modulos = (secao) => Modulos.LISTA.filter((m) => m.secao === secao && pode(m.id) && moduloLiberado(m.id))
     .map((m) => ({ id: m.id, label: m.label, para: ROTA_REACT[m.id] || "/modulo/" + m.id, icone: ICONE_MODULO[m.id] || "cadastro", descricao: m.descricao }));
-  const integracao = pode("integracao");
+
+  const integracao = pode("integracao") && moduloLiberado("integracao");
   const contabil = [];
   if (integracao) {
     const bancos = dados.bancos();
@@ -34,8 +39,10 @@ export function montarMenu(pode, ehAdmin) {
       ]
     });
   }
-  if (pode("conciliacao")) contabil.push({ id: "conciliacao", label: "Conciliação", para: "/conciliacao", icone: "conciliacao" });
-  if (pode("contabil-lucros")) {
+  if (pode("conciliacao") && moduloLiberado("conciliacao")) {
+    contabil.push({ id: "conciliacao", label: "Conciliação", para: "/conciliacao", icone: "conciliacao" });
+  }
+  if (pode("contabil-lucros") && moduloLiberado("lucros")) {
     contabil.push(
       { id: "fechamento", label: "Fechamento contábil", para: "/fechamento", icone: "fechamento" },
       { id: "encerramento", label: "Encerramento do exercício", para: "/encerramento", icone: "encerramento" },
@@ -46,21 +53,34 @@ export function montarMenu(pode, ehAdmin) {
     );
   }
   const certUrgentes = (svc) => svc.certificados().lista.filter((d) => d.situacao.status === "vencido" || d.situacao.status === "7").length;
-  const secoes = [
-    { titulo: "Contábil", itens: contabil },
-    { titulo: "Fiscal", itens: modulos("Fiscal") },
-    { titulo: "Departamento Pessoal", itens: modulos("Departamento Pessoal") },
-    // Departamento Cadastro: o número ao lado é o que venceu ou vence em até 7 dias
-    { titulo: "Departamento Cadastro", itens: pode("mod-vencimentos") ? [
-      { id: "dep-empresas", label: "Empresas", para: "/departamento-cadastro/empresas", icone: "empresa" },
+
+  // Itens de Departamento Cadastro: Empresas fica sempre visível se tiver permissão de ver empresas
+  const temVencimentos = pode("mod-vencimentos") && moduloLiberado("vencimentos");
+  const itensCadastro = [];
+  if (pode("mod-vencimentos")) {
+    itensCadastro.push({ id: "dep-empresas", label: "Empresas", para: "/empresas", icone: "empresa" });
+  }
+  if (temVencimentos) {
+    itensCadastro.push(
       { id: "dep-certidoes", label: "Certidões", para: "/departamento-cadastro/certidoes", icone: "certidao", contador: depCadastro.urgentes("certidoes") },
       { id: "dep-certificados", label: "Certificados digitais", para: "/departamento-cadastro/certificados", icone: "cadeado", contador: certUrgentes(depCadastro) },
       { id: "dep-alvaras", label: "Alvarás", para: "/departamento-cadastro/alvaras", icone: "alvara", contador: depCadastro.urgentes("alvaras") },
       { id: "dep-importar", label: "Importar e demonstração", para: "/departamento-cadastro/importar", icone: "importar" }
-    ] : [] },
-    // Em Dia: tela em React (a grade simples); o módulo antigo saiu
-    { titulo: "Escritório", itens: modulos("Escritório").concat(pode("mod-em-dia") ? [{ id: "em-dia", label: "Em Dia", para: "/em-dia", icone: "emdia" }] : []) }
+    );
+  }
+
+  const itensEscritorio = modulos("Escritório").concat(
+    pode("mod-em-dia") && moduloLiberado("em-dia") ? [{ id: "em-dia", label: "Em Dia", para: "/em-dia", icone: "emdia" }] : []
+  );
+
+  const secoes = [
+    { titulo: "Contábil", itens: contabil },
+    { titulo: "Fiscal", itens: modulos("Fiscal") },
+    { titulo: "Departamento Pessoal", itens: modulos("Departamento Pessoal") },
+    { titulo: "Departamento Cadastro", itens: itensCadastro },
+    { titulo: "Escritório", itens: itensEscritorio }
   ];
+
   if (ehAdmin) {
     secoes.push({
       titulo: "Administração",

@@ -11,6 +11,7 @@ import { nomeDoTipo, textoSituacao } from "../lib/depCadastro.mjs";
 import { Selo } from "../componentes/contabil/ui.jsx";
 import Icone from "../componentes/Icone.jsx";
 import { avaliarTodasEmpresas } from "../lib/limitesFaturamento.mjs";
+import { escritorioAtivo, podeUsarModulo, obterConsumoPlano } from "../lib/multiEscritorio.mjs";
 
 const COR_SETOR = { contabil: "border-brand-fill", fiscal: "border-ink-2", pessoal: "border-credit", cadastro: "border-warn", escritorio: "border-info" };
 const ICO_SETOR = { contabil: "bg-brand-soft text-brand", fiscal: "bg-surface-2 text-ink-2 border border-line", pessoal: "bg-ok-soft text-credit", cadastro: "bg-warn-soft text-warn", escritorio: "bg-info-soft text-info" };
@@ -173,8 +174,25 @@ export default function Inicio() {
     setMsg(feitos.length ? "Exemplos carregados em: " + feitos.join(", ") + "." : "Os módulos já tinham dados; nada foi alterado.");
   };
   if (!r) return <p className="text-muted">Não consegui montar o resumo. Abra as ferramentas pelo menu.</p>;
-  const setores = I.SETORES_CAPA.map((s) => Object.assign({}, s, { ferramentas: s.ferramentas.filter((f) => pode(f.area)) })).filter((s) => s.ferramentas.length);
+  const esc = escritorioAtivo();
+  const moduloDaArea = (area) => {
+    if (area === "integracao") return "integracao";
+    if (area === "conciliacao") return "conciliacao";
+    if (area === "contabil-lucros") return "lucros";
+    if (area === "mod-vencimentos") return "vencimentos";
+    if (area === "mod-em-dia") return "em-dia";
+    if (area === "mod-iss" || area === "mod-icms" || area === "mod-ibs-cbs") return "fiscal";
+    if (area === "mod-horas") return "horas";
+    if (area === "mod-notasync") return "notasync";
+    return area.replace(/^mod-/, "");
+  };
+  const setores = I.SETORES_CAPA.map((s) =>
+    Object.assign({}, s, {
+      ferramentas: s.ferramentas.filter((f) => pode(f.area) && podeUsarModulo(esc, moduloDaArea(f.area)))
+    })
+  ).filter((s) => s.ferramentas.length);
   const qtd = setores.reduce((n, s) => n + s.ferramentas.length, 0);
+  const consumo = useMemo(() => obterConsumoPlano(), [esc?.id, esc?.planoId]);
 
   return (
     <div className="max-w-[1180px] flex flex-col gap-[22px]">
@@ -190,6 +208,55 @@ export default function Inicio() {
           <span className="text-[13px] leading-snug text-[#F4EFE6]/80">ferramentas<br />disponíveis para você</span>
         </div>
       </header>
+
+      {/* Widget Uso do Plano (v3) */}
+      {consumo && (
+        <div className="cartao p-4 flex flex-col gap-3 bg-surface border border-line">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-[12px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded bg-brand-soft text-brand border border-brand/20">
+                Plano {consumo.plano?.nome || "Escritório"}
+              </span>
+              <span className="text-[13px] text-ink-2 font-medium">Uso atual de recursos</span>
+            </div>
+            {(consumo.usuarios.atingido || consumo.empresas.atingido || consumo.armazenamento.atingido) && (
+              <span className="text-[12.5px] font-semibold text-warn flex items-center gap-1.5">
+                <Icone nome="alerta" className="w-4 h-4" />
+                limite do plano atingido; fale conosco para mudar de plano
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="p-3 rounded-xl bg-surface-2 border border-line flex flex-col gap-1.5">
+              <div className="flex justify-between text-[12.5px]">
+                <span className="text-muted font-medium">Usuários</span>
+                <strong className="font-semibold tabular-nums">{consumo.usuarios.atual} / {consumo.usuarios.limite}</strong>
+              </div>
+              <div className="w-full bg-line rounded-full h-2 overflow-hidden">
+                <div className={"h-full rounded-full transition-all " + (consumo.usuarios.atingido ? "bg-warn" : "bg-brand-fill")} style={{ width: `${Math.min(100, consumo.usuarios.percentual)}%` }} />
+              </div>
+            </div>
+            <div className="p-3 rounded-xl bg-surface-2 border border-line flex flex-col gap-1.5">
+              <div className="flex justify-between text-[12.5px]">
+                <span className="text-muted font-medium">Empresas</span>
+                <strong className="font-semibold tabular-nums">{consumo.empresas.atual} / {consumo.empresas.limite}</strong>
+              </div>
+              <div className="w-full bg-line rounded-full h-2 overflow-hidden">
+                <div className={"h-full rounded-full transition-all " + (consumo.empresas.atingido ? "bg-warn" : "bg-brand-fill")} style={{ width: `${Math.min(100, consumo.empresas.percentual)}%` }} />
+              </div>
+            </div>
+            <div className="p-3 rounded-xl bg-surface-2 border border-line flex flex-col gap-1.5">
+              <div className="flex justify-between text-[12.5px]">
+                <span className="text-muted font-medium">Armazenamento</span>
+                <strong className="font-semibold tabular-nums">{consumo.armazenamento.atualGb} GB / {consumo.armazenamento.limiteGb} GB</strong>
+              </div>
+              <div className="w-full bg-line rounded-full h-2 overflow-hidden">
+                <div className={"h-full rounded-full transition-all " + (consumo.armazenamento.atingido ? "bg-warn" : "bg-brand-fill")} style={{ width: `${Math.min(100, consumo.armazenamento.percentual)}%` }} />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {!r.vazio && (
         <div className={"grid grid-cols-2 gap-2.5 " + (r.numeros.length > 4 ? "md:grid-cols-3 2xl:grid-cols-6" : "xl:grid-cols-4")}>

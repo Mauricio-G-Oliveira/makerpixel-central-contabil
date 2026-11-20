@@ -1,0 +1,26 @@
+server:
+  port: 8088
+
+spring:
+  application:
+    name: notasync-app
+  datasource:
+    url: jdbc:h2:file:./data/notasync;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;AUTO_SERVER=TRUE
+    driverClassName: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+notasync:
+  modo: simulador
+  sef:
+    url: http://localhost:8089/nfce/ws/distribuicao/DistribuicaoNfceDownload.asmx
+  agendamento:
+    cron: "0 0 2 * * *"
+  saida: ./xml-saida
+  central:
+    url: http://localhost:8080/api/v1/notasync/lote
+    token: ${NOTASYNC_CENTRAL_TOKEN:}

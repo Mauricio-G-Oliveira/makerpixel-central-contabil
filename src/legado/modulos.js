@@ -25,7 +25,7 @@
       descricao: "Conferência de CST, base e alíquotas de IBS/CBS (LC 214/2025)",
       icone: '<path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6zM9 12l2 2 4-4"/>',
       botaoTema: "#btnTheme", tema: "classe" },
-    { id: "mod-iss", label: "ISS Tubarão", pasta: "modulos/iss-tubarao/", secao: "Fiscal",
+    { id: "mod-iss", label: "ISS Municipal", pasta: "modulos/iss-tubarao/", secao: "Fiscal",
       descricao: "Meu ISS (Prefeitura Moderna): XML do Movimento Econômico, ISS retido e retenções federais",
       icone: '<path d="M4 4h16v16H4zM8 9h8M8 13h8M8 17h5"/>',
       botaoTema: "#is-sem-botao-tema", tema: "data-theme" },

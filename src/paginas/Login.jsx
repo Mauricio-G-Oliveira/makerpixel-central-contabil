@@ -9,7 +9,7 @@ const RECURSOS = [
   "Distribuição de lucros, IRRF e REINF",
   "Departamento Cadastro: empresas, certidões, alvarás e faturamento",
   "Em Dia: o que cada setor fez no mês",
-  "Apuração de ICMS, auditor IBS/CBS e ISS de Tubarão",
+  "Apuração de ICMS, auditor IBS/CBS e ISS Municipal",
   "Controle de horas do Departamento Pessoal"
 ];
 

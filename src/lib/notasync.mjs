@@ -475,8 +475,8 @@ export function gerarSementesNfceDemo() {
   const empresas = [
     { id: "emp-1", nome: "Mercado Modelo Ltda", cnpj: "11222333000181" },
     { id: "emp-2", nome: "Padaria & Confeitaria Central Ltda", cnpj: "44555666000177" },
-    { id: "emp-3", nome: "Farmácia Exemplo de Tubarão Ltda", cnpj: "77888999000155" },
-    { id: "emp-4", nome: "Auto Posto Catarinense Ltda", cnpj: "12345678000195" },
+    { id: "emp-3", nome: "Farmácia Exemplo Ltda", cnpj: "77888999000155" },
+    { id: "emp-4", nome: "Posto Exemplo Ltda", cnpj: "12345678000195" },
   ];
 
   const documentos = [];
@@ -547,7 +547,7 @@ export function gerarSementesNfceDemo() {
     {
       id: "exec-3",
       empresaId: "emp-3",
-      empresaNome: "Farmácia Exemplo de Tubarão Ltda",
+      empresaNome: "Farmácia Exemplo Ltda",
       dataHora: "2026-11-17T11:32:40-03:00",
       cStat: 117,
       xMotivo: "Fim do lote de notas",
@@ -558,7 +558,7 @@ export function gerarSementesNfceDemo() {
     {
       id: "exec-4",
       empresaId: "emp-4",
-      empresaNome: "Auto Posto Catarinense Ltda",
+      empresaNome: "Posto Exemplo Ltda",
       dataHora: "2026-11-17T11:33:05-03:00",
       cStat: 8002,
       xMotivo: "Contador transmissor não é contabilista deste CNPJ no SAT",

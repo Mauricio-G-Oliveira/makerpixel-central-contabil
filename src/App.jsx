@@ -24,6 +24,9 @@ import AdminMakerPixel from "./paginas/AdminMakerPixel.jsx";
 import { AvisosProvider } from "./componentes/Avisos.jsx";
 import AvisoAtualizacao from "./componentes/AvisoAtualizacao.jsx";
 
+import ModuloNaoContratado from "./componentes/ModuloNaoContratado.jsx";
+import { podeUsarModulo, escritorioAtivo } from "./lib/multiEscritorio.mjs";
+
 function Protegida({ children }) {
   const { carregando, usuario } = useAuth();
   const local = useLocation();
@@ -42,6 +45,15 @@ function SoArea({ area, children }) {
   return pode(area) ? children : <Navigate to="/" replace />;
 }
 
+/** Só entra se o escritório tiver o módulo contratado e ativo. Senão exibe tela de contratação. */
+function SoModulo({ modulo, children }) {
+  const esc = escritorioAtivo();
+  if (!podeUsarModulo(esc, modulo)) {
+    return <ModuloNaoContratado modulo={modulo} />;
+  }
+  return children;
+}
+
 export default function App() {
   return (
     <AuthProvider>
@@ -53,25 +65,25 @@ export default function App() {
           <Route element={<Protegida><Layout /></Protegida>}>
             <Route index element={<Inicio />} />
             <Route path="modulo/:id" element={<ModuloAntigo />} />
-            <Route path="integracao" element={<SoArea area="integracao"><Integracao /></SoArea>} />
-            <Route path="conciliacao" element={<SoArea area="conciliacao"><Conciliacao /></SoArea>} />
-            <Route path="conta/:id" element={<SoArea area="integracao"><Conta /></SoArea>} />
-            <Route path="cadastro/:id" element={<SoArea area="integracao"><Cadastro /></SoArea>} />
-            <Route path="departamento-cadastro/:secao" element={<SoArea area="mod-vencimentos"><DepCadastro /></SoArea>} />
+            <Route path="integracao" element={<SoModulo modulo="integracao"><SoArea area="integracao"><Integracao /></SoArea></SoModulo>} />
+            <Route path="conciliacao" element={<SoModulo modulo="conciliacao"><SoArea area="conciliacao"><Conciliacao /></SoArea></SoModulo>} />
+            <Route path="conta/:id" element={<SoModulo modulo="integracao"><SoArea area="integracao"><Conta /></SoArea></SoModulo>} />
+            <Route path="cadastro/:id" element={<SoModulo modulo="integracao"><SoArea area="integracao"><Cadastro /></SoArea></SoModulo>} />
+            <Route path="departamento-cadastro/:secao" element={<SoModulo modulo="vencimentos"><SoArea area="mod-vencimentos"><DepCadastro /></SoArea></SoModulo>} />
             <Route path="empresas" element={<SoArea area="mod-vencimentos"><Empresas /></SoArea>} />
             <Route path="buscar" element={<Navigate to="/empresas" replace />} />
-            <Route path="contabil/faturamentos" element={<SoArea area="contabil-lucros"><Faturamentos /></SoArea>} />
-            <Route path="contabil/demonstrativos" element={<SoArea area="contabil-lucros"><Demonstrativos /></SoArea>} />
-            <Route path="em-dia" element={<SoArea area="mod-em-dia"><EmDia /></SoArea>} />
-            <Route path="lucros" element={<SoArea area="contabil-lucros"><Lucros secao="distribuicoes" /></SoArea>} />
-            <Route path="reinf" element={<SoArea area="contabil-lucros"><Lucros secao="reinf" /></SoArea>} />
-            <Route path="fechamento" element={<SoArea area="contabil-lucros"><Fechamento /></SoArea>} />
-            <Route path="encerramento" element={<SoArea area="contabil-lucros"><Encerramento /></SoArea>} />
-            <Route path="iss" element={<SoArea area="mod-iss"><Iss /></SoArea>} />
-            <Route path="icms" element={<SoArea area="mod-icms"><Icms /></SoArea>} />
-            <Route path="horas" element={<SoArea area="mod-horas"><Horas /></SoArea>} />
-            <Route path="ibs-cbs" element={<SoArea area="mod-ibs-cbs"><IbsCbs /></SoArea>} />
-            <Route path="notasync" element={<SoArea area="mod-notasync"><NotaSync /></SoArea>} />
+            <Route path="contabil/faturamentos" element={<SoModulo modulo="lucros"><SoArea area="contabil-lucros"><Faturamentos /></SoArea></SoModulo>} />
+            <Route path="contabil/demonstrativos" element={<SoModulo modulo="lucros"><SoArea area="contabil-lucros"><Demonstrativos /></SoArea></SoModulo>} />
+            <Route path="em-dia" element={<SoModulo modulo="em-dia"><SoArea area="mod-em-dia"><EmDia /></SoArea></SoModulo>} />
+            <Route path="lucros" element={<SoModulo modulo="lucros"><SoArea area="contabil-lucros"><Lucros secao="distribuicoes" /></SoArea></SoModulo>} />
+            <Route path="reinf" element={<SoModulo modulo="lucros"><SoArea area="contabil-lucros"><Lucros secao="reinf" /></SoArea></SoModulo>} />
+            <Route path="fechamento" element={<SoModulo modulo="lucros"><SoArea area="contabil-lucros"><Fechamento /></SoArea></SoModulo>} />
+            <Route path="encerramento" element={<SoModulo modulo="lucros"><SoArea area="contabil-lucros"><Encerramento /></SoArea></SoModulo>} />
+            <Route path="iss" element={<SoModulo modulo="fiscal"><SoArea area="mod-iss"><Iss /></SoArea></SoModulo>} />
+            <Route path="icms" element={<SoModulo modulo="fiscal"><SoArea area="mod-icms"><Icms /></SoArea></SoModulo>} />
+            <Route path="horas" element={<SoModulo modulo="horas"><SoArea area="mod-horas"><Horas /></SoArea></SoModulo>} />
+            <Route path="ibs-cbs" element={<SoModulo modulo="fiscal"><SoArea area="mod-ibs-cbs"><IbsCbs /></SoArea></SoModulo>} />
+            <Route path="notasync" element={<SoModulo modulo="notasync"><SoArea area="mod-notasync"><NotaSync /></SoArea></SoModulo>} />
             {/* o antigo Painel de vencimentos virou Certidões e Alvarás */}
             <Route path="modulo/mod-vencimentos" element={<Navigate to="/departamento-cadastro/certidoes" replace />} />
             <Route path="usuarios" element={<SoAdmin><Usuarios /></SoAdmin>} />

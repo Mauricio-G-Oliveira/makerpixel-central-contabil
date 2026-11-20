@@ -93,7 +93,7 @@ describe("multiEscritorio.mjs", async () => {
     assert.match(msg, /Olá Roberto!/);
     assert.match(msg, /roberto@sigma\.com/);
     assert.match(msg, /Abcd-1234-efgh/);
-    assert.match(msg, /MakerPixel Contábil/);
-    assert.match(msg, /Tubarão\/SC/);
+    assert.match(msg, /Central Contábil/);
+    assert.match(msg, /Equipe MakerPixel/);
   });
 });

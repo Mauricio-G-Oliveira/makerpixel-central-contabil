@@ -334,18 +334,32 @@ export function podeUsarModulo(escritorio, modulo) {
     return false;
   }
 
+  const modulos = Array.isArray(escritorio?.modulos)
+    ? escritorio.modulos.map((m) => String(m).replace(/^mod-/, "").toLowerCase())
+    : [];
+
+  // Se o módulo está diretamente na lista
+  if (modulos.includes(idNormalizado)) {
+    return true;
+  }
+
+  // Pacote Fiscal: quem possui "fiscal" tem direito a ICMS, ISS, Auditor IBS/CBS (Reforma) e NotaSync
+  const ferramentasFiscais = ["icms", "iss", "ibs-cbs", "auditor-ibs-cbs", "reforma", "notasync", "danfse"];
+  if (ferramentasFiscais.includes(idNormalizado) && modulos.includes("fiscal")) {
+    return true;
+  }
+
   const mapaAlias = {
     "ibs-cbs": "reforma",
     "auditor-ibs-cbs": "reforma",
-    "danfse": "danfse"
+    "danfse": "danfse",
+    "icms": "fiscal",
+    "iss": "fiscal",
+    "contabil-lucros": "lucros"
   };
   const aliasResolvido = mapaAlias[idNormalizado] || idNormalizado;
 
-  const modulos = Array.isArray(escritorio?.modulos) ? escritorio.modulos : [];
-  return modulos.some((m) => {
-    const limpo = String(m).replace(/^mod-/, "").toLowerCase();
-    return limpo === idNormalizado || limpo === aliasResolvido;
-  });
+  return modulos.some((m) => m === idNormalizado || m === aliasResolvido);
 }
 
 /**

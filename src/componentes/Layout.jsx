@@ -67,7 +67,7 @@ export default function Layout() {
   const [, atualizar] = useState(0);
   const [, versaoDados] = useContabil();   // conta nova, unidade distribuída: o menu acompanha
   const [, versaoCad] = useDepCadastro();   // certidão renovada: o número no menu acompanha
-  const secoes = useMemo(() => montarMenu(pode, ehAdmin), [pode, ehAdmin, local.pathname, versaoDados, versaoCad]);   // eslint-disable-line
+  const secoes = useMemo(() => montarMenu(pode, ehAdmin), [pode, ehAdmin, local.pathname, versaoDados, versaoCad, versaoEscritorio]);   // eslint-disable-line
   const [fechadas, setFechadas] = useState(() => lerJson("menu:fechadas", FECHADAS_PADRAO));
   const [integracaoAberta, setIntegracaoAberta] = useState(() => lerLocal("menu:integracao") === "aberta");
   const [recolhido, setRecolhido] = useState(() => lerLocal("menu:recolhido") === "1");

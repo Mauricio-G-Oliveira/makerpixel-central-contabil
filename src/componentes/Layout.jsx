@@ -65,6 +65,7 @@ export default function Layout() {
   const navegar = useNavigate();
   const ehAdmin = usuario && usuario.perfil === "admin";
   const [, atualizar] = useState(0);
+  const [versaoEscritorio, setVersaoEscritorio] = useState(0);
   const [, versaoDados] = useContabil();   // conta nova, unidade distribuída: o menu acompanha
   const [, versaoCad] = useDepCadastro();   // certidão renovada: o número no menu acompanha
   const secoes = useMemo(() => montarMenu(pode, ehAdmin), [pode, ehAdmin, local.pathname, versaoDados, versaoCad, versaoEscritorio]);   // eslint-disable-line
@@ -76,7 +77,6 @@ export default function Layout() {
   const { auth } = useAuth();
   const { instalar } = usePwa();
 
-  const [versaoEscritorio, setVersaoEscritorio] = useState(0);
   const escritorio = useMemo(() => escritorioAtivo(), [versaoEscritorio]);
   const stAcesso = useMemo(() => statusAcesso(escritorio), [escritorio]);
   const stTeste = useMemo(() => statusTeste(escritorio), [escritorio]);

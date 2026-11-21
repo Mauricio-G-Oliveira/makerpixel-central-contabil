@@ -15,6 +15,12 @@ import {
   gerarSementesNfceDemo,
   exportarNfceParaCsv,
   validarPeriodoDisponivelSef,
+  validarUploadCertificadoA1,
+  mascararTitularCertificado,
+  calcularStatusVencimentoCertificado,
+  validarCnpjModulo11,
+  parsearEmpresasCsv,
+  verificarEsperaBuscaAgora,
 } from "../src/lib/notasync.mjs";
 
 test("NotaSync - Validação e extração de chave de acesso (Módulo 11)", () => {
@@ -244,4 +250,117 @@ test("NotaSync - Janela de período disponível na SEF/SC (mês atual e 2 anteri
   const rMuitoFuturo = validarPeriodoDisponivelSef("2026-11-25T00:00:00Z", agora);
   assert.equal(rMuitoFuturo.disponivel, false);
 });
+
+test("NotaSync Fase 3 - Validação de upload do cofre e limite 50 KB", () => {
+  // 1. Recusa sem aceite de termo
+  const semTermo = validarUploadCertificadoA1({ tamanhoBytes: 10000, senha: "123", aceitouTermo: false });
+  assert.equal(semTermo.valido, false);
+  assert.match(semTermo.erro, /aceitar o termo/);
+
+  // 2. Recusa sem senha
+  const semSenha = validarUploadCertificadoA1({ tamanhoBytes: 10000, senha: "", aceitouTermo: true });
+  assert.equal(semSenha.valido, false);
+  assert.match(semSenha.erro, /senha do certificado/);
+
+  // 3. Recusa arquivo maior que 50 KB
+  const arquivoGrande = validarUploadCertificadoA1({ tamanhoBytes: 52 * 1024, senha: "123", aceitouTermo: true });
+  assert.equal(arquivoGrande.valido, false);
+  assert.match(arquivoGrande.erro, /50 KB/);
+
+  // 4. Aceita parâmetros válidos
+  const valido = validarUploadCertificadoA1({ tamanhoBytes: 15 * 1024, senha: "minhasenha", aceitouTermo: true });
+  assert.equal(valido.valido, true);
+});
+
+test("NotaSync Fase 3 - Mascaramento de titular de certificado (e-CPF e e-CNPJ)", () => {
+  const titularCnpj = mascararTitularCertificado("CONTABILIDADE MODELO LTDA:11222333000181", "11222333000181", "E_CNPJ");
+  assert.equal(titularCnpj, "CONTABILIDADE MODELO LTDA (11.***.***/0001-81)");
+
+  const titularCpf = mascararTitularCertificado("MARIA SILVA CONTADORA:12345678901", "12345678901", "E_CPF");
+  assert.equal(titularCpf, "MARIA SILVA CONTADORA (***.456.789-**)");
+});
+
+test("NotaSync Fase 3 - Avisos de vencimento em 30, 15 e 7 dias", () => {
+  const agora = new Date("2026-11-20T12:00:00Z");
+
+  // Vencido
+  const expirado = calcularStatusVencimentoCertificado(new Date("2026-11-19T12:00:00Z"), agora);
+  assert.equal(expirado.status, "EXPIRADO");
+  assert.ok(expirado.alerta);
+
+  // Crítico 7 dias (vence em 3 dias)
+  const critico = calcularStatusVencimentoCertificado(new Date("2026-11-23T12:00:00Z"), agora);
+  assert.equal(critico.status, "CRITICO_7_DIAS");
+  assert.match(critico.alerta, /crítica.*3 dias/);
+
+  // Alerta 15 dias (vence em 12 dias)
+  const alerta15 = calcularStatusVencimentoCertificado(new Date("2026-12-02T12:00:00Z"), agora);
+  assert.equal(alerta15.status, "ALERTA_15_DIAS");
+
+  // Aviso 30 dias (vence em 25 dias)
+  const aviso30 = calcularStatusVencimentoCertificado(new Date("2026-12-15T12:00:00Z"), agora);
+  assert.equal(aviso30.status, "AVISO_30_DIAS");
+
+  // Válido e seguro (vence em 90 dias)
+  const seguro = calcularStatusVencimentoCertificado(new Date("2027-02-18T12:00:00Z"), agora);
+  assert.equal(seguro.status, "OK");
+  assert.equal(seguro.alerta, null);
+});
+
+test("NotaSync Fase 4 - Validação de DV de CNPJ (Módulo 11)", () => {
+  assert.equal(validarCnpjModulo11("11.222.333/0001-81"), true);
+  assert.equal(validarCnpjModulo11("11222333000181"), true);
+
+  // DV inválido
+  assert.equal(validarCnpjModulo11("11.222.333/0001-00"), false);
+  // Repetidos
+  assert.equal(validarCnpjModulo11("11111111111111"), false);
+  assert.equal(validarCnpjModulo11(""), false);
+  assert.equal(validarCnpjModulo11(null), false);
+});
+
+test("NotaSync Fase 4 - Importação de CSV com validação de DV e limite de empresas", () => {
+  const csv = [
+    "cnpj;razao_social",
+    "11.222.333/0001-81;Empresa Alpha Ltda",
+    "11.222.333/0001-00;Empresa Com Dv Invalido", // erro DV
+    "11222333000181;Empresa Alpha Repetida", // já cadastrada
+    "22.333.444/0001-92;Empresa Beta Ltda", // válida se DV ok
+  ].join("\n");
+
+  const res = parsearEmpresasCsv(csv, 2);
+  assert.equal(res.totalLinhas, 5);
+  assert.ok(res.empresasValidas.length >= 1);
+  assert.ok(res.erros.some(e => e.motivo.includes("Dígito verificador")));
+
+  // Teste de limite de empresas atingido
+  const csvMuitas = [
+    "cnpj,razao_social",
+    "11.222.333/0001-81,Empresa 1",
+    "11.222.333/0002-62,Empresa 2",
+    "11.222.333/0003-43,Empresa 3"
+  ].join("\n");
+
+  const resLimite = parsearEmpresasCsv(csvMuitas, 2);
+  assert.equal(resLimite.limiteAtingido, true);
+  assert.equal(resLimite.empresasValidas.length, 2);
+});
+
+test("NotaSync Fase 4 - Verificação de intervalo de espera regulamentar (HTTP 429)", () => {
+  const agora = new Date("2026-11-20T12:00:00Z");
+
+  // Próxima busca no futuro -> bloqueado com 429
+  const proximaFutura = new Date("2026-11-20T13:00:00Z");
+  const bloqueado = verificarEsperaBuscaAgora(proximaFutura, agora);
+  assert.equal(bloqueado.podeConsultar, false);
+  assert.equal(bloqueado.segundosRestantes, 3600);
+  assert.ok(bloqueado.erro);
+
+  // Próxima busca no passado -> liberado
+  const proximaPassada = new Date("2026-11-20T11:00:00Z");
+  const liberado = verificarEsperaBuscaAgora(proximaPassada, agora);
+  assert.equal(liberado.podeConsultar, true);
+  assert.equal(liberado.segundosRestantes, 0);
+});
+
 

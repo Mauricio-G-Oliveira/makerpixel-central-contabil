@@ -616,3 +616,177 @@ export function validarPeriodoDisponivelSef(dataEmissao, agora = new Date()) {
   return { disponivel: true, motivo: "Dentro da janela regulamentar SEF/SC" };
 }
 
+/**
+ * Valida os pré-requisitos para envio de certificado A1 ao cofre seguro (Fase 3).
+ */
+export function validarUploadCertificadoA1({ tamanhoBytes, senha, aceitouTermo }) {
+  if (!aceitouTermo) {
+    return { valido: false, erro: "É obrigatório aceitar o termo de custódia e uso seguro do certificado digital." };
+  }
+  if (!senha || senha.trim().length === 0) {
+    return { valido: false, erro: "A senha do certificado digital é obrigatória." };
+  }
+  if (tamanhoBytes > 50 * 1024) {
+    return { valido: false, erro: "Certificado excede o limite máximo permitido de 50 KB." };
+  }
+  return { valido: true };
+}
+
+/**
+ * Aplica máscara de privacidade para titular do certificado (CPF ou CNPJ).
+ */
+export function mascararTitularCertificado(titular, documento, tipo = "E_CNPJ") {
+  const docLimpo = String(documento || "").replace(/\D/g, "");
+  let docMascarado = "";
+
+  if (docLimpo.length === 14) {
+    // 12.***.***/0001-90
+    docMascarado = `${docLimpo.slice(0, 2)}.***.***/${docLimpo.slice(8, 12)}-${docLimpo.slice(12, 14)}`;
+  } else if (docLimpo.length === 11) {
+    // ***.456.789-**
+    docMascarado = `***.${docLimpo.slice(3, 6)}.${docLimpo.slice(6, 9)}-**`;
+  }
+
+  let nome = String(titular || "").trim();
+  if (nome.includes(":")) {
+    nome = nome.substring(0, nome.indexOf(":")).trim();
+  }
+
+  if (docMascarado) {
+    return `${nome} (${docMascarado})`;
+  }
+  return nome;
+}
+
+/**
+ * Calcula status e alertas de vencimento do certificado (avisos em 30, 15 e 7 dias).
+ */
+export function calcularStatusVencimentoCertificado(dataValidade, agora = new Date()) {
+  if (!dataValidade) {
+    return { diasRestantes: 0, status: "DESCONHECIDO", alerta: null };
+  }
+  const val = dataValidade instanceof Date ? dataValidade : new Date(dataValidade);
+  const ref = agora instanceof Date ? agora : new Date(agora);
+
+  const diffMs = val.getTime() - ref.getTime();
+  const diasRestantes = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+
+  if (diasRestantes < 0) {
+    return { diasRestantes, status: "EXPIRADO", alerta: "Certificado digital expirado!" };
+  }
+  if (diasRestantes <= 7) {
+    return { diasRestantes, status: "CRITICO_7_DIAS", alerta: `Atenção crítica: certificado vence em ${diasRestantes} dias!` };
+  }
+  if (diasRestantes <= 15) {
+    return { diasRestantes, status: "ALERTA_15_DIAS", alerta: `Alerta: certificado vence em ${diasRestantes} dias.` };
+  }
+  if (diasRestantes <= 30) {
+    return { diasRestantes, status: "AVISO_30_DIAS", alerta: `Aviso: certificado vence em ${diasRestantes} dias.` };
+  }
+  return { diasRestantes, status: "OK", alerta: null };
+}
+
+/**
+ * Valida o dígito verificador de um CNPJ (Módulo 11).
+ */
+export function validarCnpjModulo11(cnpj) {
+  if (!cnpj) return false;
+  const limpo = String(cnpj).replace(/\D/g, "");
+  if (limpo.length !== 14) return false;
+  if (/^(\d)\1{13}$/.test(limpo)) return false;
+
+  const peso1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+  let soma = 0;
+  for (let i = 0; i < 12; i++) {
+    soma += Number.parseInt(limpo[i], 10) * peso1[i];
+  }
+  let r = soma % 11;
+  const dv1 = r < 2 ? 0 : 11 - r;
+  if (Number.parseInt(limpo[12], 10) !== dv1) return false;
+
+  const peso2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+  soma = 0;
+  for (let i = 0; i < 13; i++) {
+    soma += Number.parseInt(limpo[i], 10) * peso2[i];
+  }
+  r = soma % 11;
+  const dv2 = r < 2 ? 0 : 11 - r;
+  return Number.parseInt(limpo[13], 10) === dv2;
+}
+
+/**
+ * Analisa e importa linhas de um arquivo CSV de empresas respeitando o limite do plano.
+ */
+export function parsearEmpresasCsv(conteudoCsv, limiteEmpresas = 20, jaCadastradasCnpjs = new Set()) {
+  const linhas = String(conteudoCsv || "").split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const empresasValidas = [];
+  const erros = [];
+  let jaCadastradasQtd = 0;
+  let limiteAtingido = false;
+
+  const setCnpjs = new Set(jaCadastradasCnpjs);
+
+  for (let i = 0; i < linhas.length; i++) {
+    const linha = linhas[i];
+    if (i === 0 && linha.toLowerCase().includes("cnpj")) continue; // Pula cabeçalho
+
+    const partes = linha.includes(";") ? linha.split(";") : linha.split(",");
+    const rawCnpj = partes[0] ? partes[0].trim() : "";
+    const rawRazao = partes[1] ? partes[1].trim() : `Empresa ${rawCnpj}`;
+    const cnpjLimpo = rawCnpj.replace(/\D/g, "");
+
+    if (!validarCnpjModulo11(cnpjLimpo)) {
+      erros.push({ linha: i + 1, cnpj: rawCnpj, motivo: "Dígito verificador do CNPJ inválido" });
+      continue;
+    }
+
+    if (setCnpjs.has(cnpjLimpo)) {
+      jaCadastradasQtd++;
+      continue;
+    }
+
+    if (setCnpjs.size >= limiteEmpresas) {
+      limiteAtingido = true;
+      erros.push({ linha: i + 1, cnpj: rawCnpj, motivo: `Limite de empresas do plano atingido (${limiteEmpresas})` });
+      continue;
+    }
+
+    setCnpjs.add(cnpjLimpo);
+    empresasValidas.push({
+      cnpj: cnpjLimpo,
+      razaoSocial: rawRazao,
+      ativo: true
+    });
+  }
+
+  return {
+    totalLinhas: linhas.length,
+    empresasValidas,
+    erros,
+    jaCadastradasQtd,
+    limiteAtingido
+  };
+}
+
+/**
+ * Verifica se a empresa está no período de espera regulamentar da SEF/SC (HTTP 429).
+ */
+export function verificarEsperaBuscaAgora(proximaConsulta, agora = new Date()) {
+  if (!proximaConsulta) return { podeConsultar: true, segundosRestantes: 0 };
+  const prox = proximaConsulta instanceof Date ? proximaConsulta : new Date(proximaConsulta);
+  const ref = agora instanceof Date ? agora : new Date(agora);
+
+  const diffMs = prox.getTime() - ref.getTime();
+  if (diffMs > 0) {
+    const segundosRestantes = Math.ceil(diffMs / 1000);
+    return {
+      podeConsultar: false,
+      segundosRestantes,
+      permitidoAPartirDe: prox.toISOString(),
+      erro: "Aguarde o intervalo regulamentar da SEF/SC antes de uma nova busca."
+    };
+  }
+  return { podeConsultar: true, segundosRestantes: 0 };
+}
+
+

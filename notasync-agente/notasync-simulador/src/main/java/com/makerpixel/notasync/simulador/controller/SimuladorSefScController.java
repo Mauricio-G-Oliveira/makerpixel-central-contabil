@@ -54,11 +54,41 @@ public class SimuladorSefScController {
             return gerarEnvelopeRetorno(cenarioForcado, "Cenário simulado: " + cenarioForcado, ultNuNSU, 0, "");
         }
 
-        // 2. CNPJ sem vínculo no SAT (retorna 8002)
+        // 2. Cenários automáticos pré-configurados por CNPJ de teste
         if (GeradorCenarios.CNPJ_SEM_VINCULO_SAT.equals(cnpj)) {
             return gerarEnvelopeRetorno(
                     8002,
                     "Contador transmissor não consta como Contabilista Vinculado no SAT da SEF/SC",
+                    ultNuNSU,
+                    0,
+                    ""
+            );
+        }
+
+        if (GeradorCenarios.CNPJ_USO_INDEVIDO_110.equals(cnpj)) {
+            return gerarEnvelopeRetorno(
+                    110,
+                    "Uso indevido do web service (consultas repetidas sem intervalo obrigatório de 1h)",
+                    ultNuNSU,
+                    0,
+                    ""
+            );
+        }
+
+        if (GeradorCenarios.CNPJ_BLOQUEIO_657.equals(cnpj)) {
+            return gerarEnvelopeRetorno(
+                    657,
+                    "Bloqueio temporário por excesso de requisições na SEF/SC (aguardar de 1 a 12 horas)",
+                    ultNuNSU,
+                    0,
+                    ""
+            );
+        }
+
+        if (GeradorCenarios.CNPJ_SEM_NOTAS_117.equals(cnpj)) {
+            return gerarEnvelopeRetorno(
+                    117,
+                    "Fim do lote de notas para este CNPJ (nenhum documento novo localizado)",
                     ultNuNSU,
                     0,
                     ""

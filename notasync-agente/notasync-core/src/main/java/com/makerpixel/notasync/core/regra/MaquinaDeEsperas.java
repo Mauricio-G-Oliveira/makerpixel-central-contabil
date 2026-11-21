@@ -1,6 +1,7 @@
 package com.makerpixel.notasync.core.regra;
 
 import com.makerpixel.notasync.core.modelo.AcaoConsumo;
+import com.makerpixel.notasync.core.modelo.EstadoConsulta;
 import com.makerpixel.notasync.core.modelo.EstadoEmpresa;
 
 import java.time.Duration;
@@ -15,6 +16,10 @@ public class MaquinaDeEsperas {
     public static final Duration ESPERA_SINCRONIZADO = Duration.ofHours(12);
     public static final Duration ESPERA_USO_INDEVIDO = Duration.ofHours(1);
     public static final int MAX_TENTATIVAS_BLOQUEIO = 3;
+
+    public AcaoConsumo decidirProximaAcao(int cStat, int qtdDocumentosRetornados, EstadoConsulta estado, Instant agora) {
+        return decidirProximaAcao(cStat, qtdDocumentosRetornados, estado != null ? estado.toEstadoEmpresa() : null, agora);
+    }
 
     /**
      * Avalia o retorno da consulta e o histórico recente para determinar a próxima ação.

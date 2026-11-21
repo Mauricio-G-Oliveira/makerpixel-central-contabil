@@ -78,6 +78,11 @@ public class SefScNfceFonte implements FonteDeNotas {
     }
 
     @Override
+    public ResultadoConsulta consultar(EstadoConsulta estado, Credencial cred) throws FonteException {
+        return consultar(estado != null ? estado.toEstadoEmpresa() : null, cred);
+    }
+
+    @Override
     public ResultadoConsulta consultar(EstadoEmpresa estado, Credencial cred) throws FonteException {
         if (estado == null || estado.cnpj() == null || estado.cnpj().isBlank()) {
             throw new FonteException(id(), "CNPJ da empresa não informado para consulta");

@@ -17,7 +17,11 @@ import java.util.List;
 @Component
 public class GeradorCenarios {
 
-    public static final String CNPJ_SEM_VINCULO_SAT = "12345678000195";
+    public static final String CNPJ_SEM_VINCULO_SAT = "12345678000195"; // Cenário 8002
+    public static final String CNPJ_USO_INDEVIDO_110 = "22333444000199"; // Cenário 110
+    public static final String CNPJ_BLOQUEIO_657 = "33444555000188"; // Cenário 657
+    public static final String CNPJ_SEM_NOTAS_117 = "55666777000122"; // Cenário 117 direto
+
 
     /**
      * Gera lista de documentos fictícios para simulação de lote.

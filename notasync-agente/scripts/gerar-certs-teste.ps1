@@ -29,7 +29,7 @@ keytool -genkeypair `
   -storetype PKCS12 `
   -storepass $Senha `
   -keypass $Senha `
-  -dname "CN=Contabilidade Modelo Teste:00000000000, OU=Certificado Teste NotaSync, O=MakerPixel Tech, L=Florianopolis, ST=SC, C=BR"
+  -dname "CN=Contabilidade Modelo Teste:00000000000, OU=Certificado Teste NotaSync, O=MakerPixel Tech, L=Cidade Ficticia, ST=SC, C=BR"
 
 Write-Host "==> Certificado gerado com sucesso em: $ArquivoP12" -ForegroundColor Green
 Write-Host "    Alias: $Alias"

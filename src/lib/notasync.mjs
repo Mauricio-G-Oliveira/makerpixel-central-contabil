@@ -582,3 +582,37 @@ export function exportarNfceParaCsv(documentos = []) {
   });
   return [cabecalho, ...linhas].join("\r\n");
 }
+
+/**
+ * Valida se uma data de emissão está dentro da janela regulamentar da SEF/SC (mês atual e 2 anteriores, tolerância 1 dia).
+ * Em conformidade com o Boletim Técnico 2026/003 (Central Contábil v3 Fase 2).
+ */
+export function validarPeriodoDisponivelSef(dataEmissao, agora = new Date()) {
+  const d = dataEmissao instanceof Date ? dataEmissao : new Date(dataEmissao);
+  const ref = agora instanceof Date ? agora : new Date(agora);
+
+  if (Number.isNaN(d.getTime())) {
+    return { disponivel: false, motivo: "Data de emissão inválida" };
+  }
+
+  // Tolerância máxima de 1 dia para emissões ligeiramente futuras (relógio desajustado)
+  const limiteFuturo = new Date(ref.getTime() + 24 * 60 * 60 * 1000);
+  if (d > limiteFuturo) {
+    return { disponivel: false, motivo: "Data futura além da tolerância permitida de 1 dia" };
+  }
+
+  // Início dos 2 meses anteriores (ex.: Nov/2026 -> 01/09/2026 00:00:00)
+  const anoAtual = ref.getFullYear();
+  const mesAtual = ref.getMonth();
+  const limitePassado = new Date(anoAtual, mesAtual - 2, 1, 0, 0, 0, 0);
+
+  if (d < limitePassado) {
+    return {
+      disponivel: false,
+      motivo: "Período expirado na SEF/SC (disponíveis apenas o mês atual e os 2 meses anteriores)"
+    };
+  }
+
+  return { disponivel: true, motivo: "Dentro da janela regulamentar SEF/SC" };
+}
+

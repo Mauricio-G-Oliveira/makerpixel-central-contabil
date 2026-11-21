@@ -14,6 +14,7 @@ import {
   desempacotarLoteSef,
   gerarSementesNfceDemo,
   exportarNfceParaCsv,
+  validarPeriodoDisponivelSef,
 } from "../src/lib/notasync.mjs";
 
 test("NotaSync - Validação e extração de chave de acesso (Módulo 11)", () => {
@@ -214,3 +215,33 @@ test("NotaSync - Sementes demo e exportação CSV", () => {
   const linhas = csv.split("\r\n");
   assert.equal(linhas.length, 6); // Cabeçalho + 5 registros
 });
+
+test("NotaSync - Janela de período disponível na SEF/SC (mês atual e 2 anteriores, tolerância 1 dia)", () => {
+  const agora = new Date("2026-11-20T12:00:00Z");
+
+  // Mês atual: válido
+  const r1 = validarPeriodoDisponivelSef("2026-11-10T08:00:00Z", agora);
+  assert.equal(r1.disponivel, true);
+
+  // 1 mês atrás (Out/2026): válido
+  const r2 = validarPeriodoDisponivelSef("2026-10-25T14:30:00Z", agora);
+  assert.equal(r2.disponivel, true);
+
+  // 2 meses atrás (Set/2026): válido
+  const r3 = validarPeriodoDisponivelSef("2026-09-01T03:00:00Z", agora);
+  assert.equal(r3.disponivel, true);
+
+  // 3 meses atrás (Ago/2026): expirado
+  const r4 = validarPeriodoDisponivelSef("2026-08-31T23:59:59Z", agora);
+  assert.equal(r4.disponivel, false);
+  assert.match(r4.motivo, /apenas o mês atual e os 2 meses anteriores/);
+
+  // 12 horas no futuro: tolerado
+  const rFuturo = validarPeriodoDisponivelSef("2026-11-21T00:00:00Z", agora);
+  assert.equal(rFuturo.disponivel, true);
+
+  // 3 dias no futuro: rejeitado
+  const rMuitoFuturo = validarPeriodoDisponivelSef("2026-11-25T00:00:00Z", agora);
+  assert.equal(rMuitoFuturo.disponivel, false);
+});
+

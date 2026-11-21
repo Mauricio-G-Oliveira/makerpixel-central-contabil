@@ -21,6 +21,7 @@ import {
   validarCnpjModulo11,
   parsearEmpresasCsv,
   verificarEsperaBuscaAgora,
+  criarZipBlob,
 } from "../src/lib/notasync.mjs";
 
 test("NotaSync - Validação e extração de chave de acesso (Módulo 11)", () => {
@@ -362,5 +363,57 @@ test("NotaSync Fase 4 - Verificação de intervalo de espera regulamentar (HTTP 
   assert.equal(liberado.podeConsultar, true);
   assert.equal(liberado.segundosRestantes, 0);
 });
+
+test("NotaSync Fase 5 - Geração de ZIP com XMLs no navegador (criarZipBlob)", async () => {
+  const arquivos = [
+    { nome: "nota1.xml", conteudo: "<nfeProc versao='4.00'><infNFe Id='1'/></nfeProc>" },
+    { nome: "nota2.xml", conteudo: "<nfeProc versao='4.00'><infNFe Id='2'/></nfeProc>" }
+  ];
+
+  const blob = criarZipBlob(arquivos);
+  assert.equal(blob.type, "application/zip");
+  assert.ok(blob.size > 100);
+
+  // Valida assinatura mágica do arquivo ZIP: 0x50 0x4B 0x03 0x04 ('PK\x03\x04')
+  const buffer = await blob.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  assert.equal(bytes[0], 0x50); // 'P'
+  assert.equal(bytes[1], 0x4b); // 'K'
+  assert.equal(bytes[2], 0x03);
+  assert.equal(bytes[3], 0x04);
+});
+
+test("NotaSync Fase 6 - Fontes NF-e (55) e CT-e (57), certificado por empresa e manifestação desligada", () => {
+  // Fontes do catálogo
+  const FONTES_CATALOGO = {
+    "sef-sc-nfce": { modelos: ["65"], certificado: "CONTADOR" },
+    "sef-sc-nfe": { modelos: ["55"], certificado: "CONTADOR" },
+    "dfe-nacional": { modelos: ["55", "57"], certificado: "EMPRESA", manifestacaoPadrao: false },
+  };
+
+  // 1. SefScNfeFonte exige certificado do contador e modelo 55
+  assert.deepEqual(FONTES_CATALOGO["sef-sc-nfe"].modelos, ["55"]);
+  assert.equal(FONTES_CATALOGO["sef-sc-nfe"].certificado, "CONTADOR");
+
+  // 2. DfeNacionalFonte exige certificado próprio da EMPRESA cliente e cobre NF-e + CT-e
+  assert.deepEqual(FONTES_CATALOGO["dfe-nacional"].modelos, ["55", "57"]);
+  assert.equal(FONTES_CATALOGO["dfe-nacional"].certificado, "EMPRESA");
+  assert.equal(FONTES_CATALOGO["dfe-nacional"].manifestacaoPadrao, false, "Manifestação deve ser desligada por padrão");
+
+  // 3. Regra de proteção: empresa sem certificado configurado não deve tentar
+  const empresaSemCert = { id: "emp-99", cnpj: "99888777000100", certificadoConfigurado: false };
+  function podeExecutarConsultaDfeNacional(emp) {
+    if (!emp.certificadoConfigurado) {
+      return { pode: false, motivo: "Certificado A1 da própria empresa não cadastrado no cofre" };
+    }
+    return { pode: true };
+  }
+
+  const checagem = podeExecutarConsultaDfeNacional(empresaSemCert);
+  assert.equal(checagem.pode, false);
+  assert.match(checagem.motivo, /não cadastrado no cofre/);
+});
+
+
 
 

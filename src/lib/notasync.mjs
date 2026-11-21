@@ -789,4 +789,103 @@ export function verificarEsperaBuscaAgora(proximaConsulta, agora = new Date()) {
   return { podeConsultar: true, segundosRestantes: 0 };
 }
 
+// Tabela de CRC32 pré-calculada para montagem rápida de ZIP
+const CRC_TABLE = new Uint32Array(256);
+for (let i = 0; i < 256; i++) {
+  let c = i;
+  for (let k = 0; k < 8; k++) {
+    c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+  }
+  CRC_TABLE[i] = c;
+}
+
+/**
+ * Cria um arquivo ZIP (Blob) contendo os arquivos XML fornecidos.
+ * Executado 100% no navegador sem dependências externas (modo demonstração e fallback).
+ */
+export function criarZipBlob(arquivos = []) {
+  const partes = [];
+  const entradasDir = [];
+  let offset = 0;
+  const enc = new TextEncoder();
+
+  for (const arq of arquivos) {
+    const nomeBytes = enc.encode(arq.nome);
+    const dadosBytes = typeof arq.conteudo === "string" ? enc.encode(arq.conteudo) : (arq.conteudo || new Uint8Array(0));
+    const tamanho = dadosBytes.length;
+
+    let crc = 0 ^ -1;
+    for (let i = 0; i < dadosBytes.length; i++) {
+      crc = (crc >>> 8) ^ CRC_TABLE[(crc ^ dadosBytes[i]) & 0xff];
+    }
+    crc = (crc ^ -1) >>> 0;
+
+    // Header local (30 bytes + nome)
+    const header = new Uint8Array(30 + nomeBytes.length);
+    const view = new DataView(header.buffer);
+    view.setUint32(0, 0x04034b50, true);
+    view.setUint16(4, 20, true);
+    view.setUint16(6, 0, true);
+    view.setUint16(8, 0, true); // stored (sem compressão)
+    view.setUint16(10, 0, true);
+    view.setUint16(12, 0, true);
+    view.setUint32(14, crc, true);
+    view.setUint32(18, tamanho, true);
+    view.setUint32(22, tamanho, true);
+    view.setUint16(26, nomeBytes.length, true);
+    view.setUint16(28, 0, true);
+    header.set(nomeBytes, 30);
+
+    partes.push(header, dadosBytes);
+
+    // Header central directory (46 bytes + nome)
+    const cdir = new Uint8Array(46 + nomeBytes.length);
+    const cview = new DataView(cdir.buffer);
+    cview.setUint32(0, 0x02014b50, true);
+    cview.setUint16(4, 20, true);
+    cview.setUint16(6, 20, true);
+    cview.setUint16(8, 0, true);
+    cview.setUint16(10, 0, true);
+    cview.setUint16(12, 0, true);
+    cview.setUint16(14, 0, true);
+    cview.setUint32(16, crc, true);
+    cview.setUint32(20, tamanho, true);
+    cview.setUint32(24, tamanho, true);
+    cview.setUint16(28, nomeBytes.length, true);
+    cview.setUint16(30, 0, true);
+    cview.setUint16(32, 0, true);
+    cview.setUint16(34, 0, true);
+    cview.setUint16(36, 0, true);
+    cview.setUint32(38, 0, true);
+    cview.setUint32(42, offset, true);
+    cdir.set(nomeBytes, 46);
+    entradasDir.push(cdir);
+
+    offset += header.length + dadosBytes.length;
+  }
+
+  const offsetCentralDir = offset;
+  let tamanhoCentralDir = 0;
+  for (const c of entradasDir) {
+    tamanhoCentralDir += c.length;
+    partes.push(c);
+  }
+
+  // End of Central Directory Record (22 bytes)
+  const eocd = new Uint8Array(22);
+  const eview = new DataView(eocd.buffer);
+  eview.setUint32(0, 0x06054b50, true);
+  eview.setUint16(4, 0, true);
+  eview.setUint16(6, 0, true);
+  eview.setUint16(8, arquivos.length, true);
+  eview.setUint16(10, arquivos.length, true);
+  eview.setUint32(12, tamanhoCentralDir, true);
+  eview.setUint32(16, offsetCentralDir, true);
+  eview.setUint16(20, 0, true);
+  partes.push(eocd);
+
+  return new Blob(partes, { type: "application/zip" });
+}
+
+
 

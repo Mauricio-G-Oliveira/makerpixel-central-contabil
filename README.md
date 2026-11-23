@@ -1,231 +1,223 @@
-# Central Contábil — by MakerPixel
+# Central Contábil v3 — by MakerPixel Tech
 
 [![Demonstração Online](https://img.shields.io/badge/Demo-GitHub%20Pages-0284c7?style=for-the-badge&logo=github)](https://mauricio-g-oliveira.github.io/makerpixel-central-contabil/)
+[![Domínio Oficial](https://img.shields.io/badge/Site-makerpixeltech.com.br-059669?style=for-the-badge)](https://makerpixeltech.com.br)
 [![Backend API](https://img.shields.io/badge/API-Java%2021%20%2F%20Spring%20Boot%203-emerald?style=for-the-badge&logo=springboot)](https://github.com/Mauricio-G-Oliveira/makerpixel-gestao-api)
-[![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL%20%2B%20RLS-336791?style=for-the-badge&logo=postgresql)](https://github.com/Mauricio-G-Oliveira/makerpixel-gestao-api)
-[![Testes Unitários](https://img.shields.io/badge/Testes-389%20Passando%20(100%25)-10b981?style=for-the-badge&logo=nodedotjs)](https://github.com/Mauricio-G-Oliveira/makerpixel-central-contabil)
+[![PostgreSQL & Supabase](https://img.shields.io/badge/Database-PostgreSQL%20%2B%20RLS-336791?style=for-the-badge&logo=postgresql)](https://github.com/Mauricio-G-Oliveira/makerpixel-gestao-api)
+[![Testes Automatizados](https://img.shields.io/badge/Testes-426%20Passando%20(100%25)-10b981?style=for-the-badge&logo=nodedotjs)](https://github.com/Mauricio-G-Oliveira/makerpixel-central-contabil)
 [![PWA](https://img.shields.io/badge/PWA-Instalável%20e%20Offline--First-6366f1?style=for-the-badge)](https://mauricio-g-oliveira.github.io/makerpixel-central-contabil/)
 
-> **Plataforma SaaS para escritórios de contabilidade**: conciliação bancária inteligente, buscador automatizado de NFC-e SEF/SC sem intermediadores (NotaSync), conformidade tributária e gestão operacional multi-tenant.
+> **Plataforma SaaS para escritórios de contabilidade e empresas**: sincronização automatizada de notas fiscais SEF/SC sem intermediadores (NotaSync), auditoria em lote da Reforma Tributária (IBS/CBS - LC 214/2025), gerador de DANFSe WASM no navegador com zero telemetria, conversor universal de XML para Excel e conciliação bancária inteligente.
 
 ---
 
-## 🎬 Vídeo de Demonstração
+## 🎬 Apresentação Comercial
 
 ![Demonstração Comercial Central Contábil](docs/demo-central-contabil.gif)
 
-> 📹 **Vídeo comercial completo em Full HD (com narração neural e trilha sonora)**: assista diretamente pelo repositório em [`docs/apresentacao-comercial-central-contabil.mp4`](docs/apresentacao-comercial-central-contabil.mp4) ou acesse a [demonstração online](https://mauricio-g-oliveira.github.io/makerpixel-central-contabil/).
+> 📹 **Vídeo institucional completo em Full HD**: assista diretamente em [`docs/apresentacao-comercial-central-contabil.mp4`](docs/apresentacao-comercial-central-contabil.mp4) ou acesse a [demonstração online](https://mauricio-g-oliveira.github.io/makerpixel-central-contabil/).
 
 ---
 
-## 1. O Problema que Resolve
+## 1. Módulos do Sistema
 
-Escritórios de contabilidade lidam com um volume diário de sistemas fragmentados, retrabalho em planilhas dispersas e tarefas manuais demoradas. Um dos custos mais recorrentes e evitáveis é o pagamento de mensalidades a **intermediadores para baixar arquivos XML de NFC-e**, quando a própria Secretaria da Fazenda (SEF/SC) fornece esse serviço **gratuitamente** para contabilistas vinculados no SAT.
+### ⚡ 1. NotaSync — Sincronizador de Documentos Fiscais (SEF/SC & DF-e)
+- **Busca Contínua SEF/SC**: download automático de NFC-e (mod. 65) pelo web service oficial para contadores (Boletim Técnico SEF/SC 2026/003, v1.00-1) sem intermediadores ou mensalidades avulsas.
+- **Cofre Seguro de Certificados A1**: custódia criptografada em repouso com **AES-256-GCM** e *Envelope Encryption*. O titular é mascarado na interface (`11.***.***/0001-**`).
+- **Diagnóstico Amigável**: tradução clara de status da Fazenda com foco no **erro 8002** (*Contabilista não vinculado no SAT*) e link direto de orientação.
+- **Detecção de Cancelamentos**: processamento automático de eventos 110111 e deduplicação estrita de chaves de 44 dígitos (Módulo 11).
+- **Exportação em Lote**: geração de arquivos ZIP com os XMLs do mês estruturados e exportação de relatórios em planilha.
 
-A **Central Contábil** unifica essas rotinas em uma única plataforma SaaS:
-- Elimina mensalidades de intermediadores através do módulo **NotaSync** (buscador gratuito direto da SEF/SC via web service para contadores);
-- Automatiza a **conciliação bancária** entre extratos (OFX/PDF) e lançamentos contábeis com regras de tolerância e conferência em lote;
-- Monitora prazos críticos de certidões, alvarás com leitura inteligente de PDFs e certificados digitais A1/A3 com alertas de 30 dias;
-- Distribui a carteira de clientes entre os colaboradores por setor com isolamento multi-tenant e segurança LGPD.
+### 🏛️ 2. Reforma Tributária — Auditor IBS/CBS & Motor RTC (LC 214/2025)
+- **Conferência em Lote**: validação item a item de arquivos XML de NF-e, NFC-e e NFS-e contra as regras oficiais da LC 214/2025 e NT 2025.002.
+- **Classificação em 5 Níveis**:
+  - `OK`: destacado confere com o cálculo oficial (tolerância R$ 0,01);
+  - `DIVERGENCIA_VALOR`: diferença numérica entre alíquota destacada e a apurada;
+  - `ENQUADRAMENTO_INVALIDO`: CST e cClassTrib incompatíveis ou NCM divergente;
+  - `SEM_GRUPO_IBSCBS`: documento emitido sem as tags obrigatórias da reforma;
+  - `ERRO_CALCULO`: inconsistência de base ou valores malformados.
+- **Comparativo Lado a Lado**: modal interativo exibindo o valor destacado na nota versus o cálculo oficial, memória de cálculo detalhada e fundamentação legal.
+- **Calculadora RTC como Serviço**: integração com a calculadora oficial da Receita Federal executando como serviço privado desacoplado em container Docker.
+- **Exportação de Divergências**: download de planilha CSV/Excel estruturada para envio direto ao cliente para correção no ERP.
 
----
+### 📄 3. DANFSe WASM — Emissor de Documento Auxiliar no Navegador
+- **Engine WebAssembly**: geração client-side em milissegundos baseada no gerador oficial da Receita Federal (`cmd/danfse-wasm/main.go`).
+- **Zero Telemetria e Privacidade Total**: o XML da NFS-e nunca é enviado para a nuvem; o PDF é montado na memória do navegador.
+- **Recursos**: pré-visualização com zoom e impressão, suporte a canhoto de recebimento e download avulso em PDF ou em lote compactado em ZIP.
 
-## 2. Módulos do Sistema
+### 📊 4. XML → Excel Universal
+- **Conversor Multi-Aba**: processa notas avulsas, pastas compactadas em ZIP ou documentos importados do NotaSync gerando planilhas XLSX com duas abas dedicadas:
+  - **Aba 1 (Notas Fiscais)**: dados de cabeçalho, emitente, destinatário, valores totais e tributos destacados (ICMS, ISS, CBS, IBS).
+  - **Aba 2 (Itens dos Produtos e Serviços)**: código, descrição, NCM, CFOP, quantidade, valores unitários e tributação detalhada.
 
-### ⚡ NotaSync — Buscador Automatizado de NFC-e SEF/SC (Destaque v2)
-Busca automatizada de NFC-e (modelo 65) direto da SEF/SC pelo web service oficial para contadores (Boletim Técnico SEF/SC 2026/003, v1.00-1).
-- **Agente local (`notasync-agente`)**: guarda o certificado A1 localmente na máquina do escritório, garantindo que a chave privada nunca trafegue pela nuvem. Salva os arquivos físicos em `xml-saida/{CNPJ}/{AAAA-MM}/{chave}.xml` e sincroniza apenas os metadados fiscais com a Central Contábil;
-- **Deduplicação estrita**: controle inteligente por chave de acesso de 44 dígitos com validação do dígito verificador via Módulo 11;
-- **Detecção de cancelamentos**: processamento de eventos 110111 e 110112 atualizando o status fiscal sem duplicar documentos;
-- **Diagnóstico traduzido da SEF**: conversão de cStats técnicos em linguagem prática para o contador, com destaque para o **erro 8002** (*Contabilista não vinculado no SAT*) com link de orientação imediata;
-- **Exportação Excel/CSV**: download rápido para cruzamentos fiscais e fechamento do mês.
+### ⚖️ 5. Conciliação Bancária com IA
+- **Importação Universal**: compatível com extratos bancários de bancos brasileiros (Banco do Brasil, Itaú, Nubank, Unicred, Sicredi, Caixa, etc.).
+- **Regras Inteligentes**: tolerância configurável de datas, baixa automática de tarifas e juros por palavras-chave e conciliação de pagamentos em lote.
 
-![Módulo NotaSync](docs/prints/11-notasync.png)
+### 🏢 6. Departamento Cadastro & Fechamento
+- **Alvarás com Leitor de PDFs**: leitura local de documentos com extração de datas e alertas de renovação.
+- **Obrigações e Certidões**: monitoramento de CNDs Federal, Estadual, Municipal e CRF do FGTS com alertas preventivos de 7 e 30 dias.
+- **Distribuição de Lucros e REINF**: apuração de limites de isenção, retenção de IRRF e transmissão da REINF por competência.
 
----
-
-### 📊 Painel Executivo
-Visão panorâmica em tempo real de todas as áreas do escritório (Cadastro, Fiscal, Contábil e Pessoal). Apresenta métricas agregadas de clientes, avisos de vencimentos urgentes e atalhos rápidos para as rotinas diárias.
-
-![Painel Executivo](docs/prints/02-inicio.png)
-
----
-
-### 🏢 Departamento Cadastro
-Gestão inteligente da carteira de empresas e cumprimento de obrigações acessórias:
-- **Busca unificada**: localização instantânea por CNPJ, código ou razão social com sincronização de sócios (QSA) e dados da Receita Federal;
-- **Alvarás com leitor de PDFs**: leitura local de arquivos em PDF com extração automática de CNPJ, emissão e vencimento, decidindo de forma autônoma entre cadastrar novo, renovar ou anexar;
-- **Certificados Digitais**: controle dedicado de certificados A1 e A3 com alertas preventivos de 30 dias e botão de disparo rápido de mensagens por WhatsApp/E-mail.
-
-| Ficha Cadastral da Empresa | Alvarás e Leitor de PDF | Certificados Digitais |
-| :---: | :---: | :---: |
-| ![Ficha](docs/prints/04-ficha-empresa.png) | ![Alvarás](docs/prints/03-alvaras.png) | ![Certificados](docs/prints/05-certificados.png) |
-
----
-
-### ⚖️ Conciliação Bancária
-Confronto automatizado entre extrato bancário (OFX/PDF) e os lançamentos contábeis do cliente:
-- Tolerância de datas configurável por cliente (ex.: 2 dias úteis);
-- Baixa automática de tarifas bancárias, IOF e rendimentos por palavras-chave cadastradas;
-- Junção de pagamentos em lote: vários lançamentos somados que fecham com um único débito no extrato;
-- Persistência com trava de concorrência otimista (HTTP 409 em caso de salvamentos simultâneos).
-
-![Conciliação Bancária](docs/prints/12-conciliacao.png)
+### 🌐 7. Site Público & Funil de Vendas (`makerpixeltech.com.br`)
+- Página pública institucional voltada para escritórios contábeis e empresas.
+- Apresentação de planos (Essencial, Escritório e Corporativo) e formulário com funil de conversão direta para o WhatsApp comercial da MakerPixel Tech.
 
 ---
 
-### 🛡️ Fiscal & Auditor IBS/CBS
-- **Auditor IBS/CBS**: validação de alíquotas, CST e benefícios da Reforma Tributária (LC 214/2025);
-- **Apuração de ICMS**: prévia da apuração mensal a partir dos XMLs de NF-e e NFC-e;
-- **ISS**: importação de XML do Movimento Econômico com conferência de ISS retido na fonte e retenções federais.
-
-![Auditor IBS/CBS](docs/prints/06-auditor-ibs-cbs.png)
-
----
-
-### ⏰ Departamento Pessoal — Controle de Horas
-- Importação e leitura automática de folhas de presença dos clientes;
-- Apuração automatizada de horas extras de 50% e 100%, faltas e atrasos;
-- Geração de espelho de ponto pronto para integração com o fechamento da folha de pagamento.
-
-![Controle de Horas](docs/prints/13-horas.png)
-
----
-
-## 3. Arquitetura do Sistema
+## 2. Arquitetura do Sistema
 
 ```mermaid
 flowchart TD
-    subgraph Nuvem["Central Contábil (Nuvem / SaaS)"]
-        UI["Frontend React 18 + PWA\n(Tailwind CSS, Vite)"]
-        API["Central API (Spring Boot 3)\n(Java 21, Security, JPA)"]
-        DB[("PostgreSQL\n(Multi-Tenant RLS, Flyway)")]
-        UI <-->|REST API + JWT| API
-        API <-->|Tenant Context / SQL| DB
+    subgraph Browser["Navegador do Usuário (Client-Side / PWA)"]
+        UI["Interface React 18 + Vite\n(makerpixel-techsystem)"]
+        DANFSE["Gerador DANFSe WASM\n(Zero Telemetria / Go WASM)"]
+        EXCEL["Conversor XML → Excel\n(Engine XLSX Multi-Aba)"]
+        STORE[("IndexedDB / Cache PWA\nOffline-First")]
+        
+        UI <--> DANFSE
+        UI <--> EXCEL
+        UI <--> STORE
     end
 
-    subgraph Escritorio["Escritório de Contabilidade (Máquina Local)"]
-        AGENTE["Agente NotaSync (Java 21)\n(notasync-agente)"]
-        CERT[("Certificado Digital A1\n(.pfx local protegido)")]
-        DISCO[("Armazenamento Local\nxml-saida/{CNPJ}/{AAAA-MM}/")]
-        AGENTE --- CERT
-        AGENTE -->|Salva XMLs| DISCO
-        AGENTE -->|Envia Metadados| API
+    subgraph BackendAPI["Backend API (Java 21 / Spring Boot 3)"]
+        API["Central Gestão API\n(makerpixel-gestao-api)"]
+        COFRE["Cofre Seguro de Certificados\n(AES-256-GCM Envelope Encryption)"]
+        AUDIT["Trilha de Auditoria\n(notasync_auditoria_acessos)"]
+        
+        API --- COFRE
+        API --- AUDIT
     end
 
-    subgraph SefSC["SEF/SC — Secretaria da Fazenda de SC"]
-        WS["Web Service nfceDownloadContab\n(DistribuicaoNfceDownload.asmx)"]
+    subgraph InfraDocker["Infraestrutura de Apoio (Docker Compose)"]
+        RTC["Calculadora RTC\n(Receita Federal / LC 214)"]
+        SIM["Simulador SEF/SC\n(Mocks SOAP 1.2 / NF-e 65)"]
     end
 
-    subgraph DemoSimulador["Ambiente Demo / Testes"]
-        SIM["notasync-simulador (Porta 8089)\nLotes mock gzip + base64"]
+    subgraph NuvemSupabase["Banco de Dados & Storage (Supabase / Postgres 15+)"]
+        DB[("PostgreSQL 15+\nRow Level Security (RLS)\nMulti-Tenant")]
     end
 
-    AGENTE <-->|SOAP 1.2 + mTLS Contador| WS
-    AGENTE -.->|Fallback Demo| SIM
+    subgraph OrgaosOficiais["Ambientes Governamentais Oficiais"]
+        SEF["SEF/SC - Fazenda Estadual SC\n(DistribuicaoNfceDownload.asmx)"]
+        DFE["Ambiente Nacional RFB\n(NFeDistribuicaoDFe / CTe)"]
+    end
+
+    UI <-->|REST API + JWT Bearer| API
+    API <-->|SQL + RLS Tenant ID| DB
+    API <-->|HTTP Privado :8081| RTC
+    API <-->|mTLS + Certificado A1| SEF
+    API <-->|mTLS + Certificado A1| DFE
+    API -.->|Modo Homologação| SIM
 ```
 
 ---
 
-## 4. Stack Tecnológica
+## 3. Planos e Licenciamento
 
-### Frontend
-![React](https://img.shields.io/badge/React%2018-20232A?style=flat-square&logo=react&logoColor=61DAFB)
-![Vite](https://img.shields.io/badge/Vite%205-646CFF?style=flat-square&logo=vite&logoColor=white)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind%203-38B2AC?style=flat-square&logo=tailwind-css&logoColor=white)
-![PWA](https://img.shields.io/badge/PWA-Offline--First-5A0FC8?style=flat-square)
-![Node Test](https://img.shields.io/badge/Node%20Test-389%20Suítes-green?style=flat-square)
-
-### Backend API & Agente
-![Java](https://img.shields.io/badge/Java%2021-ED8B00?style=flat-square&logo=openjdk&logoColor=white)
-![Spring Boot](https://img.shields.io/badge/Spring%20Boot%203.3-6DB33F?style=flat-square&logo=springboot&logoColor=white)
-![Spring Security](https://img.shields.io/badge/Spring%20Security-JWT-6DB33F?style=flat-square)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL%2016-316192?style=flat-square&logo=postgresql&logoColor=white)
-![Flyway](https://img.shields.io/badge/Flyway-Migrations-CC0200?style=flat-square)
-![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=flat-square&logo=docker&logoColor=white)
+| Plano | Limite Usuários | Limite Empresas | Armazenamento | Módulos Inclusos |
+| :--- | :---: | :---: | :---: | :--- |
+| **Essencial** | 2 | 20 | 5 GB | NotaSync, Reforma IBS/CBS, DANFSe, Conciliação, Cadastro |
+| **Escritório** *(Mais Escolhido)* | 5 | 60 | 20 GB | Todos os módulos + multi-usuários e prioridade |
+| **Corporativo Enterprise** | 15+ | 180+ | 100 GB+ | Recursos ilimitados, implantação guiada e suporte dedicado |
 
 ---
 
-## 5. Como Rodar o Projeto
+## 4. Como Executar Localmente
 
 ### Pré-requisitos
-- **Node.js** 20+ ou 24+
-- **Java** 21 LTS e **Maven** 3.9+ (ou Docker)
-- **PostgreSQL** 15+ (opcional: o frontend opera com banco local IndexedDB no modo demo)
+- **Node.js** v20+ ou v24+
+- **Java** 21 LTS e **Maven** 3.9+
+- **Docker** e **Docker Compose**
 
-### 1. Clonar os Repositórios
+### 1. Inicializar Infraestrutura e Calculadora RTC
 ```bash
-# Frontend
-git clone https://github.com/Mauricio-G-Oliveira/makerpixel-central-contabil.git
-cd makerpixel-central-contabil
-
-# Backend
-git clone https://github.com/Mauricio-G-Oliveira/makerpixel-gestao-api.git
+# Na raiz do projeto
+docker compose up -d postgres calculadora-rtc
 ```
 
-### 2. Rodar o Frontend (React)
+### 2. Inicializar o Backend API (Spring Boot 3)
+Em ambiente Unix / macOS:
 ```bash
-cd makerpixel-central-contabil
+cd makerpixel-gestao-api
+./mvnw spring-boot:run
+```
+Em ambiente Windows (PowerShell):
+```powershell
+cd makerpixel-gestao-api
+.\mvnw.cmd spring-boot:run
+```
+A API iniciará na porta `8080`, aplicando automaticamente as migrations Flyway `V1` a `V8`.
+
+### 3. Inicializar o Frontend (React + Vite)
+```bash
+cd makerpixel-techsystem
 npm install
 npm run dev
 ```
-Acesse `http://localhost:5173` no navegador.
-- **Login Demo**: clique no botão de acesso rápido ou utilize `admin` / senha padrão de demonstração.
-- O sistema já carrega com dados fictícios prontos em todas as telas (incluindo 4 empresas e 140 notas fiscais no NotaSync).
+Acesse a aplicação no navegador em `http://localhost:5173`.
 
-### 3. Rodar a API Backend (Spring Boot)
+### 4. Executar os Testes Automatizados
 ```bash
-cd makerpixel-gestao-api
-cp .env.example .env
-# Iniciar PostgreSQL via Docker Compose
-docker-compose up -d postgres
-
-# Executar a API
-./mvnw spring-boot:run
+cd makerpixel-techsystem
+npm test
 ```
-A API iniciará na porta `8080`, aplicando as migrations Flyway (`V1`, `V2`, `V3__notasync_nfce.sql`).
-
-### 4. Rodar o Simulador SEF/SC (Porta 8089)
-O simulador já vem embutido no backend para testes e homologação:
-```bash
-curl -X POST http://localhost:8080/notasync-simulador/ws/distribuicao/DistribuicaoNfceDownload.asmx
-```
+*Resultado esperado: 426 testes passando (100% de aprovação).*
 
 ---
 
-## 6. Segurança e LGPD
+## 5. Variáveis de Ambiente
 
-1. **Certificado Digital A1 100% Isolado**: Em conformidade com a LGPD e normas do CFC, o certificado digital do contador e suas chaves privadas **nunca** são transmitidos para o servidor da nuvem. Toda autenticação mútua TLS acontece exclusivamente no agente local (`notasync-agente`).
-2. **Dados Fictícios em Demonstrações**: Todos os CNPJs, nomes de empresas, valores e chaves de acesso apresentados em prints, vídeos, seeds e testes são **100% fictícios**, gerados com algoritmos de dígito verificador válidos para reprodução realista.
-3. **Isolamento Multi-Tenant**: O banco de dados PostgreSQL utiliza **Row Level Security (RLS)** nativo para segregação completa de dados entre escritórios (`escritorio_id`), impedindo acesso cruzado.
+> 🔒 **Atenção**: Esta seção lista exclusivamente os **nomes das variáveis de ambiente** necessárias para a configuração de produção, preservando todo e qualquer segredo.
+
+| Variável | Descrição | Onde Configurar |
+| :--- | :--- | :--- |
+| `SPRING_DATASOURCE_URL` | String de conexão JDBC com o PostgreSQL / Supabase | Backend API |
+| `SPRING_DATASOURCE_USERNAME` | Usuário do banco de dados | Backend API |
+| `SPRING_DATASOURCE_PASSWORD` | Senha de acesso ao banco de dados | Backend API |
+| `JWT_SECRET` | Chave secreta de assinatura dos tokens JWT | Backend API |
+| `ENCRYPTION_MASTER_KEY` | Chave mestra KEK (AES-256) para o cofre de certificados A1 | Backend API |
+| `CALCULADORA_RTC_URL` | URL do endpoint da Calculadora RTC (ex: `http://localhost:8081`) | Backend API |
+| `SEF_SC_ENDPOINT_URL` | Endpoint oficial do Web Service da SEF/SC | Backend API |
+| `VITE_API_URL` | URL base da API REST consumida pelo frontend | Frontend React |
+| `SUPABASE_URL` | URL do projeto Supabase | Frontend / Deploy |
+| `SUPABASE_ANON_KEY` | Chave anônima pública do Supabase | Frontend / Deploy |
 
 ---
 
-## 7. Roadmap
+## 6. Realidade de Produção vs. Demonstração / Simuladores
 
-- [x] Módulo NotaSync (NFC-e SEF/SC para contadores);
-- [x] Conciliação bancária inteligente com agrupamento em lote e tolerância;
-- [x] Auditor tributário IBS/CBS (LC 214/2025);
-- [ ] Busca de NF-e (modelo 55) e CT-e (modelo 57) pelo Ambiente Nacional (SVRS / RFB);
-- [ ] Integração com o padrão da NFS-e Nacional;
-- [ ] Expansão do buscador de NFC-e para outros estados (RS, PR, SP).
+Para manter conformidade técnica e transparência:
+- **100% Real em Produção**:
+  - Buscador NotaSync SEF/SC via web service SOAP oficial;
+  - Auditoria IBS/CBS com motor de cálculo LC 214/2025;
+  - Gerador DANFSe WASM client-side em PDF;
+  - Conversor universal XML para planilhas XLSX;
+  - Conciliação bancária de extratos OFX/PDF reais;
+  - Banco de dados PostgreSQL com RLS e isolamento multi-tenant.
+- **Ambiente de Demonstração / Simulador (GitHub Pages)**:
+  - O link de demonstração pública opera em modo sandbox com dados e CNPJs fictícios para exibição comercial sem necessidade de backend conectado.
+  - O simulador local (`notasync-simulador`) replica envelopes SOAP para testes de integração contínua sem onerar a Fazenda Estadual.
 
 ---
 
-## 8. Autor
+## 7. Documentação Complementar
 
-Desenvolvido por **Maurício Goulart de Oliveira**.
+- [`SEGURANCA.md`](SEGURANCA.md): Diretrizes completas de segurança, cofre A1 e LGPD.
+- [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md): Atribuições e licenças de componentes de terceiros.
+- [`CHANGELOG.md`](CHANGELOG.md): Histórico de versões e release notes da v3.0.0.
+- [`docs/roteiro-operacao-admin.md`](docs/roteiro-operacao-admin.md): Manual de operações do administrador.
+- [`docs/roteiro-implantacao-cliente.md`](docs/roteiro-implantacao-cliente.md): Guia de onboarding de novo cliente.
+- [`docs/roteiro-atualizacao-calculadora-rtc.md`](docs/roteiro-atualizacao-calculadora-rtc.md): Atualização do container RTC.
+- [`docs/termo-certificado.md`](docs/termo-certificado.md): Minuta técnica de custódia de certificado digital.
+- [`scripts/supabase-schema-central-contabil-v3.sql`](scripts/supabase-schema-central-contabil-v3.sql): Script DDL unificado para deploy no Supabase.
 
-- 💼 **LinkedIn**: [linkedin.com/in/mauricio-g-oliveira](https://www.linkedin.com/in/mauricio-g-oliveira/)
-- 🌐 **Portfólio**: [mauricio-g-oliveira.github.io](https://mauricio-g-oliveira.github.io/)
+---
+
+## 8. Contato & Suporte Oficial
+
+**MakerPixel Tech — Tecnologia & Automação Contábil**  
+- 🌐 **Website**: [makerpixeltech.com.br](https://makerpixeltech.com.br)  
+- 📍 **Localização**: Tubarão - Santa Catarina, Brasil  
+- 💼 **LinkedIn**: [linkedin.com/in/mauricio-g-oliveira](https://www.linkedin.com/in/mauricio-g-oliveira/)  
 - 🐙 **GitHub**: [github.com/Mauricio-G-Oliveira](https://github.com/Mauricio-G-Oliveira)
-
----
-
-## 🌐 About / Tech Stack (English)
-
-**Central Contábil** is a full-featured SaaS platform designed for Brazilian accounting firms. It streamlines financial and tax workflows by integrating bank reconciliations, tax compliance (Reforma Tributária IBS/CBS, ICMS, ISS), digital certificate expiration tracking, and **NotaSync** — an automated local downloader for NFC-e tax receipts directly from the Santa Catarina State Revenue Service (SEF/SC) SOAP web service with zero third-party fees.
-
-- **Frontend**: React 18, Vite, Tailwind CSS, PWA (Offline-First).
-- **Backend**: Java 21, Spring Boot 3, Spring Security (JWT), PostgreSQL with Row Level Security (RLS), Flyway migrations.
-- **Security**: Local-first A1 certificate handling with mutual TLS, complete tenant isolation, and strict LGPD compliance.

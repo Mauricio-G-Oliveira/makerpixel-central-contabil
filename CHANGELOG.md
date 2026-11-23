@@ -1,69 +1,35 @@
-# Changelog
+# Changelog — Central Contábil
 
-Todas as mudanças notáveis deste projeto serão documentadas neste arquivo.
-
-O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
-e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
+Todas as modificações e melhorias relevantes da plataforma são registradas neste documento.
 
 ---
 
-## [2.1.0] - 2026-10-12
+## [3.0.0] - 2026-11-23
 
-### Adicionado
-- **PWA (Progressive Web App)**: Manifesto oficial (`manifest.webmanifest`), Service Worker com estratégia de precache e botão nativo de instalação para Desktop e Mobile.
-- **Módulo de Apuração Parcial de ICMS**:
-  - Leitura e processamento de XMLs de NF-e e NFC-e 100% no navegador (Client-Side).
-  - Agrupamento automático por CFOP com conversão de entradas equivalentes de fornecedores.
-  - Alternador de inclusão/exclusão de CFOP na apuração fiscal com persistência local.
-  - Ajustes manuais de saldo credor anterior, outros créditos (CIAP, TTD) e débitos.
-  - Exportação de relatório consolidado em Excel (.xlsx) com múltiplas abas.
-- **Módulo de Auditoria IBS / CBS (Reforma Tributária LC 214/2025)**:
-  - Auditoria de notas com detecção da tag `<IBSCBS>`.
-  - Validação de CST, base de cálculo e alíquotas nominais/efetivas com redutores legais (`gRed`).
-  - Diagnóstico automatizado de conformidade (OK, Atenção, Erro).
-  - Calculadora avulsa de tributos e tabela de consulta oficial de CSTs da Reforma.
-- **Painel de Vencimentos dos Clientes**:
-  - Monitoramento de prazos críticos: Certificado Digital A1, CND Federal, CND Estadual, CND Municipal, CRF FGTS, Alvarás e Procurações.
-  - Classificação visual por faixas de criticidade: Vencidos, até 7 dias, 8 a 15 dias, 16 a 30 dias e Em dia.
-  - Registro de renovação com histórico preservado e cálculo de validade padrão.
-  - Integração para envio de alertas pré-formatados diretamente no WhatsApp do cliente.
-- **Responsividade Mobile Avançada**:
-  - Menu lateral em gaveta deslizante (Drawer) para smartphones e tablets.
-  - Botão hambúrguer com transição fluida na Topbar.
-  - Envoltórios de rolagem horizontal fluida em todas as tabelas financeiras e fiscais.
+### 🚀 Lançamento Oficial da Central Contábil v3 (MakerPixel Tech)
 
-### Modificado
-- **Identidade Visual MakerPixel Techsystem**: Redesenho do logotipo com alta fidelidade às fotos oficiais da marca, cores de alto contraste (`#0A2540` e ciano elétrico `#00A3E0`), eliminando qualquer aspecto desbotado.
-- **Dark Theme "Obsidian"**: Transição para fundo ultra-dark `#060B13` com cartões em `#0A1220` e realces ciano neon, corrigindo o contraste das fontes no modo escuro.
+#### Módulo Fiscal & Reforma Tributária (LC 214/2025)
+- **Auditor IBS/CBS em Lote**: Conferência detalhada item a item de documentos fiscais contra as regras oficiais da LC 214/2025 e NT 2025.002.
+- **Motor Calculadora RTC**: Integração desacoplada com a calculadora de referência da Receita Federal como microsserviço privado em container Docker.
+- **Classificação Inteligente**: Separação em 5 status de auditoria (`OK`, `DIVERGENCIA_VALOR`, `ENQUADRAMENTO_INVALIDO`, `SEM_GRUPO_IBSCBS`, `ERRO_CALCULO`).
+- **Modal Comparativo Lado a Lado**: Visualização clara entre o tributo destacado na nota fiscal e o cálculo oficial esperado pela legislação, com fundamentação legal e memória de cálculo.
+- **Exportação de Divergências**: Relatório formatado em Excel/CSV para orientação e saneamento de cadastro tributário junto aos clientes.
+
+#### Motor de Busca Automatizada NotaSync
+- **Sincronizador SEF/SC & DF-e Nacional**: Download contínuo de NFC-e (65), NF-e (55) e CT-e (57) sem necessidade de mensalidades a intermediadores externos.
+- **Cofre Seguro de Certificados A1**: Criptografia em repouso AES-256-GCM com Envelope Encryption, chave mestra em camadas e mascaramento de dados sensíveis.
+- **Diagnóstico Técnico Traduzido**: Tradução amigável de status da Fazenda com foco no erro SEF/SC 8002 (*Contabilista não vinculado no SAT*).
+- **Exportação e Backup**: Geração de arquivos ZIP com os XMLs do mês estruturados e download rápido em planilha.
+
+#### Gerador de DANFSe (WASM no Navegador)
+- **Zero Telemetria**: Emissão e renderização do Documento Auxiliar da NFS-e padrão nacional 100% no navegador do usuário via WebAssembly.
+- **Privacidade Absoluta**: O arquivo XML não trafega nem é armazenado em servidores externos durante a geração do PDF.
+- **Exportação em Lote**: Pré-visualização com zoom e download avulso em PDF ou empacotado em ZIP.
+
+#### Utilitários & Painel Unificado
+- **Conversor XML → Excel Universal**: Transformação de lotes de notas fiscais em planilhas XLSX estruturadas em duas abas separadas: *Notas Fiscais* e *Itens dos Produtos e Serviços*.
+- **Início Unificado Executivo**: Painel consolidado com métricas de notas sincronizadas, alertas de validade de certificados e auditoria de tributos.
+- **Site Público & Funil de Vendas**: Apresentação institucional vinculada ao domínio oficial `makerpixeltech.com.br`, planos flexíveis e solicitação de teste gratuito por 7 dias via WhatsApp.
 
 ---
-
-## [2.0.0] - 2026-10-09
-
-### Adicionado
-- **Identidade Visual MakerPixel Techsystem**: Adoção do novo branding corporativo com paleta ciano neon e navy profundo.
-- **Área Administrativa (Padrão Stageflow)**:
-  - Gestão de usuários com controle de acesso baseado em papéis (RBAC - Admin, Contador, Operador).
-  - Cadastro de empresas, códigos contábeis SCI e parâmetros operacionais.
-  - Trilha de Auditoria (Audit Log) em tempo real registrando logins, conciliações e operações.
-  - Blueprint arquitetural com documentação OpenAPI/JPA para transição para backend Java Spring Boot 3.
-- **Página de Login e Sessão**: Autenticação com sessão persistida, atalhos para perfis de demonstração e recuperação de acesso.
-- **Alternador de Tema**: Suporte completo a Dark Mode e Light Mode com persistência local.
-
----
-
-## [1.0.0] - 2026-10-08
-
-### Adicionado
-- **Paridade Contábil 100% com SCI Único**:
-  - Motor de processamento baseado nas regras da macro VBA v30.
-  - Distribuição automática de lançamentos por unidade/filial.
-  - Geração de arquivos oficiais `UNICO_<Unidade>.txt` (UTF-8 com BOM, CRLF, 16 colunas separadas por vírgula) e `PENDENCIAS_UNICO.csv`.
-- **Contas Bancárias e Lançamentos**:
-  - Cadastro de contas bancárias (Sicoob, Sicredi, Caixa, BB, Itaú, Bradesco, Santander, etc.).
-  - Motor de sugestões inteligentes de classificação por histórico e CNPJ.
-  - Exportação para Excel (TSV) e CSV.
-- **Conciliação Bancária Multi-Extrato**:
-  - Suporte a extratos em PDF (com conferência diária de saldos), OFX e TXT Sicoob.
-  - Modo Conta do Sistema e Modo Extrato × Planilha / Balancete / NF-e XML.
-- **Suíte de Testes Automatizados**: 124 testes unitários cobrindo parsers de PDF, OFX, TXT e regras contábeis.
+*MakerPixel Tech — Inovação e Automação Contábil*

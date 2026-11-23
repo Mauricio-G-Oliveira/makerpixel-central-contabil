@@ -11,8 +11,8 @@ import { escritorioAtivo, podeUsarModulo } from "./multiEscritorio.mjs";
 export { MOVIMENTOS, CADASTROS } from "./contabil.mjs";
 import { MOVIMENTOS, CADASTROS } from "./contabil.mjs";
 /** Módulos que já viraram tela em React: o menu vai direto para a rota nova. */
-export const ROTA_REACT = { "mod-iss": "/iss", "mod-icms": "/icms", "mod-horas": "/horas", "mod-ibs-cbs": "/ibs-cbs", "mod-em-dia": "/em-dia", "mod-vencimentos": "/departamento-cadastro/certidoes", "mod-notasync": "/notasync" };
-const ICONE_MODULO = { "mod-icms": "icms", "mod-ibs-cbs": "ibs", "mod-iss": "iss", "mod-vencimentos": "venc", "mod-em-dia": "emdia", "mod-horas": "horas", "mod-notasync": "notasync" };
+export const ROTA_REACT = { "mod-iss": "/iss", "mod-icms": "/icms", "mod-horas": "/horas", "mod-ibs-cbs": "/ibs-cbs", "mod-em-dia": "/em-dia", "mod-vencimentos": "/departamento-cadastro/certidoes", "mod-notasync": "/notasync", "mod-danfse": "/danfse", "mod-xml-excel": "/xml-excel" };
+const ICONE_MODULO = { "mod-icms": "icms", "mod-ibs-cbs": "ibs", "mod-iss": "iss", "mod-vencimentos": "venc", "mod-em-dia": "emdia", "mod-horas": "horas", "mod-notasync": "notasync", "mod-danfse": "danfse", "mod-xml-excel": "excel" };
 
 export const nomeDaConta = nomeDaFonte;
 

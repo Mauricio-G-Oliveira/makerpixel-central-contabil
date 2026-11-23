@@ -20,6 +20,9 @@ import Icms from "./paginas/Icms.jsx";
 import Horas from "./paginas/Horas.jsx";
 import IbsCbs from "./paginas/IbsCbs.jsx";
 import NotaSync from "./paginas/NotaSync.jsx";
+import Danfse from "./paginas/Danfse.jsx";
+import XmlExcel from "./paginas/XmlExcel.jsx";
+import SitePublico from "./paginas/SitePublico.jsx";
 import AdminMakerPixel from "./paginas/AdminMakerPixel.jsx";
 import { AvisosProvider } from "./componentes/Avisos.jsx";
 import AvisoAtualizacao from "./componentes/AvisoAtualizacao.jsx";
@@ -62,6 +65,9 @@ export default function App() {
       <HashRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/planos" element={<SitePublico />} />
+          <Route path="/apresentacao" element={<SitePublico />} />
+          <Route path="/site" element={<SitePublico />} />
           <Route element={<Protegida><Layout /></Protegida>}>
             <Route index element={<Inicio />} />
             <Route path="modulo/:id" element={<ModuloAntigo />} />
@@ -84,6 +90,8 @@ export default function App() {
             <Route path="horas" element={<SoModulo modulo="horas"><SoArea area="mod-horas"><Horas /></SoArea></SoModulo>} />
             <Route path="ibs-cbs" element={<SoModulo modulo="fiscal"><SoArea area="mod-ibs-cbs"><IbsCbs /></SoArea></SoModulo>} />
             <Route path="notasync" element={<SoModulo modulo="notasync"><SoArea area="mod-notasync"><NotaSync /></SoArea></SoModulo>} />
+            <Route path="danfse" element={<SoModulo modulo="danfse"><SoArea area="mod-danfse"><Danfse /></SoArea></SoModulo>} />
+            <Route path="xml-excel" element={<SoModulo modulo="fiscal"><SoArea area="mod-xml-excel"><XmlExcel /></SoArea></SoModulo>} />
             {/* o antigo Painel de vencimentos virou Certidões e Alvarás */}
             <Route path="modulo/mod-vencimentos" element={<Navigate to="/departamento-cadastro/certidoes" replace />} />
             <Route path="usuarios" element={<SoAdmin><Usuarios /></SoAdmin>} />

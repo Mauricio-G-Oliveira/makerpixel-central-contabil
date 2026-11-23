@@ -39,7 +39,9 @@ export const ICONES = {
   reinf: "M6 3h9l4 4v14H6zM15 3v4h4M9 12h7M9 16h4",
   empresa: "M4 21V5h10v16M14 9h6v12M7 9h4M7 13h4M7 17h4M17 13h1M17 17h1M3 21h18",
   demonstrativo: "M5 3h14v18H5zM9 8h6M9 12h6M9 16h3",
-  notasync: "M4 4v16h16V4H4zm4 4h8v2H8V8zm0 4h8v2H8v-2zm0 4h5v2H8v-2z"
+  notasync: "M4 4v16h16V4H4zm4 4h8v2H8V8zm0 4h8v2H8v-2zm0 4h5v2H8v-2z",
+  danfse: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8",
+  excel: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13l3 4M11 13l-3 4M14 13h3M14 17h3"
 };
 
 export default function Icone({ nome, className = "" }) {

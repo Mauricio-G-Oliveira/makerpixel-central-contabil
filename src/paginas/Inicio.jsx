@@ -89,6 +89,65 @@ function useResumo(usuario, pode) {
           console.warn("Aviso limites faturamento:", eLim);
         }
       }
+
+      // Métricas NotaSync (Sincronização de Documentos)
+      if (pode("mod-notasync")) {
+        try {
+          const docsSalvos = lerJson("notasync:documentos_v3");
+          if (Array.isArray(docsSalvos) && docsSalvos.length > 0) {
+            r.vazio = false;
+            r.numeros.push({
+              id: "notasync-notas",
+              rotulo: "NotaSync no Mês",
+              valor: String(docsSalvos.length),
+              sub: docsSalvos.length === 1 ? "1 nota sincronizada" : `${docsSalvos.length} notas sincronizadas`,
+              ir: { rota: "/notasync" }
+            });
+          }
+        } catch (eNs) {
+          console.warn("NotaSync resumo:", eNs);
+        }
+      }
+
+      // Certificado Digital A1 no Cofre Seguro
+      try {
+        const certSalvo = lerJson("notasync:certificado_v3");
+        if (certSalvo && certSalvo.validoAte) {
+          const ate = new Date(certSalvo.validoAte);
+          const diffDias = Math.ceil((ate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+          const tomCert = diffDias <= 7 ? "perigo" : diffDias <= 30 ? "alerta" : "";
+          r.vazio = false;
+          r.numeros.push({
+            id: "cert-cofre",
+            rotulo: "Certificado A1 no Cofre",
+            valor: diffDias <= 0 ? "Vencido" : `${diffDias} dias`,
+            sub: diffDias <= 0 ? "Renovar imediatamente" : diffDias <= 30 ? "Vence em breve" : "Certificado A1 válido",
+            tom: tomCert,
+            ir: { rota: "/notasync" }
+          });
+        }
+      } catch (eCert) {
+        console.warn("Certificado cofre resumo:", eCert);
+      }
+
+      // Auditoria IBS/CBS Reforma Tributária
+      if (pode("mod-ibs-cbs")) {
+        try {
+          const divSalvas = lerJson("reforma:divergencias_v3");
+          const totalDiv = Array.isArray(divSalvas) ? divSalvas.length : 0;
+          r.vazio = false;
+          r.numeros.push({
+            id: "ibs-cbs-auditoria",
+            rotulo: "Auditor IBS/CBS (LC 214)",
+            valor: totalDiv > 0 ? String(totalDiv) : "100%",
+            sub: totalDiv > 0 ? (totalDiv === 1 ? "1 divergência apurada" : `${totalDiv} divergências apuradas`) : "Conforme na NT 2025.002",
+            tom: totalDiv > 0 ? "alerta" : "",
+            ir: { rota: "/ibs-cbs" }
+          });
+        } catch (eIbs) {
+          console.warn("Auditor IBS/CBS resumo:", eIbs);
+        }
+      }
       return r;
     } catch (e) { console.error("Início:", e); return null; }
   }, [usuario, pode, versao, versaoEmDia, versaoLucros, versaoCad]);   // eslint-disable-line
@@ -181,9 +240,10 @@ export default function Inicio() {
     if (area === "contabil-lucros") return "lucros";
     if (area === "mod-vencimentos") return "vencimentos";
     if (area === "mod-em-dia") return "em-dia";
-    if (area === "mod-iss" || area === "mod-icms" || area === "mod-ibs-cbs") return "fiscal";
+    if (area === "mod-iss" || area === "mod-icms" || area === "mod-ibs-cbs" || area === "mod-xml-excel") return "fiscal";
     if (area === "mod-horas") return "horas";
     if (area === "mod-notasync") return "notasync";
+    if (area === "mod-danfse") return "danfse";
     return area.replace(/^mod-/, "");
   };
   const setores = I.SETORES_CAPA.map((s) =>

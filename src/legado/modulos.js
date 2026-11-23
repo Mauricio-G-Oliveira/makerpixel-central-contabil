@@ -35,12 +35,18 @@
       botaoTema: "#hr-sem-botao-tema", tema: "data-theme" },
     { id: "mod-notasync", label: "Notas Fiscais (NotaSync)", pasta: "modulos/notasync/", secao: "Fiscal",
       descricao: "Buscador automático de NFC-e direto da SEF/SC para contadores",
-      icone: '<path d="M4 4v16h16V4H4zm4 4h8v2H8V8zm0 4h8v2H8v-2zm0 4h5v2H8v-2z"/>' }
+      icone: '<path d="M4 4v16h16V4H4zm4 4h8v2H8V8zm0 4h8v2H8v-2zm0 4h5v2H8v-2z"/>' },
+    { id: "mod-danfse", label: "Gerador DANFSe (WASM)", pasta: "modulos/danfse/", secao: "Fiscal",
+      descricao: "Geração de DANFSe em PDF no navegador via WebAssembly a partir do XML de NFS-e",
+      icone: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8"/>' },
+    { id: "mod-xml-excel", label: "XML → Excel", pasta: "modulos/xml-excel/", secao: "Fiscal",
+      descricao: "Conversão de XMLs de NF-e, NFC-e e notas do NotaSync para planilha Excel",
+      icone: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13l3 4M11 13l-3 4M14 13h3M14 17h3"/>' }
   ];
 
   /** Chaves do localStorage que pertencem aos módulos (vão no backup do sistema). */
   // painelVencimentos e depCadastro: Departamento Cadastro (tela em React; o antigo painel saiu)
-  var PREFIXOS_DADOS = ["icms.", "painelVencimentos:", "depCadastro:", "emDia:", "lucros:", "horas:", "iss:", "notasync:"];
+  var PREFIXOS_DADOS = ["icms.", "painelVencimentos:", "depCadastro:", "emDia:", "lucros:", "horas:", "iss:", "notasync:", "danfse:"];
 
   function porId(id) { return LISTA.filter(function (m) { return m.id === id; })[0] || null; }
   function ehDadoDeModulo(chave) { return PREFIXOS_DADOS.some(function (p) { return chave.indexOf(p) === 0; }); }

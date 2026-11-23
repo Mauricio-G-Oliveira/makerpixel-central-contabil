@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import { AuthCore } from "../lib/legado.js";
 import { useAuth } from "../lib/auth.jsx";
 import { lerLocal, gravarLocal } from "../lib/tema.js";
@@ -224,9 +224,16 @@ export default function Login() {
             </form>
           )}
           <input ref={arquivo} type="file" accept=".json,application/json" hidden onChange={importar} />
-          <div className="mt-8 pt-4 border-t border-line flex items-center justify-between text-xs text-muted">
-            <span className="font-medium text-ink-2">Central Contábil</span>
-            <button type="button" onClick={limparCache} className="text-brand hover:underline font-medium">Forçar atualização do app</button>
+          <div className="mt-8 pt-4 border-t border-line flex flex-col gap-2 text-xs text-muted">
+            <div className="flex items-center justify-between">
+              <span className="font-medium text-ink-2">Central Contábil v3</span>
+              <button type="button" onClick={limparCache} className="text-brand hover:underline font-medium">Forçar atualização do app</button>
+            </div>
+            <div className="text-center pt-2">
+              <Link to="/planos" className="text-brand hover:underline font-semibold flex items-center justify-center gap-1">
+                Conheça os Planos e Recursos da Plataforma (makerpixeltech.com.br) →
+              </Link>
+            </div>
           </div>
         </div>
       </section>

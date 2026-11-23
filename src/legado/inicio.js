@@ -462,7 +462,11 @@
       { tab: "mod-ibs-cbs", area: "mod-ibs-cbs", icone: "ibs", nome: "Auditor IBS/CBS", resumo: "Confere os novos tributos da reforma nas notas.",
         itens: ["CST, cClassTrib, base e alíquotas da LC 214/2025", "Aponta reduções e valores divergentes item a item", "NF-e e NFS-e, calculadora manual e exportação"] },
       { tab: "mod-iss", area: "mod-iss", icone: "iss", nome: "ISS Municipal", resumo: "Conferência das retenções e notas fiscais.",
-        itens: ["Importa o XML do Movimento Econômico de cada empresa", "ISS retido e retenções federais (IR, PIS, COFINS, CSLL, INSS)", "Alertas de alíquota e valores, e Excel por empresa"] }
+        itens: ["Importa o XML do Movimento Econômico de cada empresa", "ISS retido e retenções federais (IR, PIS, COFINS, CSLL, INSS)", "Alertas de alíquota e valores, e Excel por empresa"] },
+      { tab: "mod-danfse", area: "mod-danfse", icone: "danfse", nome: "DANFSe (NFS-e WASM)", resumo: "Gera o Documento Auxiliar da NFS-e direto no navegador em PDF.",
+        itens: ["Processamento 100% no navegador sem envio à nuvem", "Pré-visualização e download avulso ou em lote ZIP", "Compatível com o padrão nacional da Receita Federal"] },
+      { tab: "mod-xml-excel", area: "mod-xml-excel", icone: "excel", nome: "XML → Excel Universal", resumo: "Conversão universal de NF-e, NFC-e e NFS-e para planilha.",
+        itens: ["Gera planilhas XLSX estruturadas com abas de notas e itens", "Totais de faturamento, ICMS, ISS e Reforma (IBS/CBS)", "Importação direta do NotaSync ou via upload de ZIP/XML"] }
     ] },
     { id: "pessoal", nome: "Departamento Pessoal", texto: "Folha de ponto dos clientes sem cartão, conferida e calculada.", ferramentas: [
       { tab: "mod-horas", area: "mod-horas", icone: "horas", nome: "Controle de horas", resumo: "Folhas de presença dos clientes que anotam o ponto à mão.",

@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import Icone from "../componentes/Icone.jsx";
 import {
   validarChaveAcesso,
   formatarChaveAcesso,
@@ -358,14 +360,32 @@ export default function NotaSync() {
             Baixar ZIP do Mês
           </button>
 
-          <button
-            type="button"
-            onClick={exportarCsv}
-            className="btn-contorno flex items-center gap-1 text-xs py-1.5 px-3"
-            title="Exportar notas em CSV para Excel"
+          <Link
+            to="/ibs-cbs"
+            className="btn-contorno flex items-center gap-1.5 text-xs py-1.5 px-3 font-semibold text-brand hover:bg-brand-soft transition"
+            title="Conferir tributos da Reforma Tributária (LC 214/2025)"
           >
+            <Icone nome="reforma" className="w-3.5 h-3.5" />
+            Conferir IBS/CBS
+          </Link>
+
+          <Link
+            to="/xml-excel"
+            className="btn-contorno flex items-center gap-1.5 text-xs py-1.5 px-3 font-semibold text-brand hover:bg-brand-soft transition"
+            title="Exportar notas fiscais para planilha Excel (.xlsx) com abas de notas e itens"
+          >
+            <Icone nome="excel" className="w-3.5 h-3.5" />
             Exportar Excel
-          </button>
+          </Link>
+
+          <Link
+            to="/danfse"
+            className="btn-contorno flex items-center gap-1.5 text-xs py-1.5 px-3 font-semibold text-brand hover:bg-brand-soft transition"
+            title="Gerar DANFSe de notas fiscais de serviço em PDF no navegador"
+          >
+            <Icone nome="danfse" className="w-3.5 h-3.5" />
+            Gerar DANFSe
+          </Link>
 
           <button
             type="button"
@@ -524,16 +544,26 @@ export default function NotaSync() {
               </div>
             </div>
 
-            {filtroEmpresa && (
-              <button
-                type="button"
-                onClick={() => baixarZipMes(filtroEmpresa)}
-                className="btn-contorno text-xs py-1.5 px-3 text-brand font-semibold flex items-center gap-1.5"
-                title="Baixar ZIP desta empresa"
+            <div className="flex items-center gap-2">
+              {filtroEmpresa && (
+                <button
+                  type="button"
+                  onClick={() => baixarZipMes(filtroEmpresa)}
+                  className="btn-contorno text-xs py-1.5 px-3 text-brand font-semibold flex items-center gap-1.5"
+                  title="Baixar ZIP desta empresa"
+                >
+                  ZIP desta Empresa
+                </button>
+              )}
+              <Link
+                to="/xml-excel"
+                className="btn-contorno text-xs py-1.5 px-3 font-semibold text-brand flex items-center gap-1.5"
+                title="Exportar notas para planilha Excel (.xlsx)"
               >
-                ZIP desta Empresa
-              </button>
-            )}
+                <Icone nome="excel" className="w-3.5 h-3.5" />
+                Excel
+              </Link>
+            </div>
           </div>
 
           {/* Tabela de Notas */}

@@ -95,3 +95,125 @@ describe("tabela da LC 214 incluída no sistema", () => {
     assert.deepEqual([j.total, j.daBase], [2, 1]);
   });
 });
+
+describe("Fase 8 — Auditoria da Reforma Tributária (LC 214/2025)", () => {
+  test("classificações oficiais e tolerância de R$ 0,01", () => {
+    assert.equal(A.TOLERANCIA_REFORMA, 0.01);
+    assert.ok(A.CLASSIFICACOES_REFORMA.OK);
+    assert.ok(A.CLASSIFICACOES_REFORMA.DIVERGENCIA_VALOR);
+    assert.ok(A.CLASSIFICACOES_REFORMA.ENQUADRAMENTO_INVALIDO);
+    assert.ok(A.CLASSIFICACOES_REFORMA.SEM_GRUPO_IBSCBS);
+    assert.ok(A.CLASSIFICACOES_REFORMA.ERRO_CALCULO);
+  });
+
+  test("auditarItemReforma classifica OK e calcula alíquotas de teste 2026", () => {
+    const itemOk = {
+      nItem: 1,
+      desc: "Notebook",
+      ncm: "84713012",
+      bc: 1000,
+      vProd: 1000,
+      cst: "000",
+      cClassTrib: "000001",
+      vCbs: 9.00,
+      vIbsUf: 1.00,
+      vIbsMun: 0.00,
+      vIbs: 1.00,
+      found: true
+    };
+    const res = A.auditarItemReforma(itemOk);
+    assert.equal(res.classificacao, "OK");
+    assert.equal(res.difTotal, 0);
+    assert.equal(res.cbsCalculada, 9);
+    assert.equal(res.ibsUfCalculado, 1);
+    assert.match(res.memoriaCalculo, /Base: R\$ 1\.000,00/);
+    assert.match(res.fundamentacaoLegal, /LC 214\/2025/);
+  });
+
+  test("auditarItemReforma detecta DIVERGENCIA_VALOR acima de R$ 0,01", () => {
+    const itemDiv = {
+      nItem: 1,
+      desc: "Cadeira",
+      ncm: "94031000",
+      bc: 1000,
+      vProd: 1000,
+      cst: "000",
+      cClassTrib: "000001",
+      vCbs: 20.00, // Divergência proposital (esperado 9)
+      vIbsUf: 1.00,
+      vIbsMun: 0.00,
+      vIbs: 1.00,
+      found: true
+    };
+    const res = A.auditarItemReforma(itemDiv);
+    assert.equal(res.classificacao, "DIVERGENCIA_VALOR");
+    assert.equal(res.difCbs, 11);
+    assert.match(res.motivoDivergencia, /diverge do cálculo oficial/);
+  });
+
+  test("auditarItemReforma detecta ENQUADRAMENTO_INVALIDO quando CST não bate com cClassTrib", () => {
+    const itemInvalido = {
+      nItem: 1,
+      desc: "Produto",
+      ncm: "84713012",
+      bc: 1000,
+      cst: "000",
+      cClassTrib: "200001", // Prefixo 200 não bate com CST 000
+      vCbs: 9.00,
+      vIbs: 1.00,
+      found: true
+    };
+    const res = A.auditarItemReforma(itemInvalido);
+    assert.equal(res.classificacao, "ENQUADRAMENTO_INVALIDO");
+    assert.match(res.motivoDivergencia, /incompatível com CST 000/);
+  });
+
+  test("auditarItemReforma detecta SEM_GRUPO_IBSCBS quando a nota não gerou as tags", () => {
+    const itemSemGrupo = {
+      nItem: 1,
+      desc: "Parafuso",
+      ncm: "73181500",
+      bc: 200,
+      vProd: 200,
+      found: false
+    };
+    const res = A.auditarItemReforma(itemSemGrupo);
+    assert.equal(res.classificacao, "SEM_GRUPO_IBSCBS");
+    assert.match(res.motivoDivergencia, /sem o grupo de tributação IBS\/CBS/);
+  });
+
+  test("sementes de demonstração geram lote com múltiplos cenários e exportam CSV", () => {
+    const sementes = A.gerarLoteReformaDemo();
+    assert.equal(sementes.length, 6);
+    const { itens, totais } = A.auditarLoteReforma(sementes);
+    assert.equal(totais.totalItens, 6);
+    assert.ok(totais.totalOk >= 2);
+    assert.ok(totais.totalDivergencias >= 1);
+    assert.ok(totais.totalInvalidos >= 1);
+    assert.ok(totais.totalSemGrupo >= 1);
+
+    const csvDivergencias = A.exportarDivergenciasCsv(itens);
+    assert.ok(csvDivergencias.startsWith("\uFEFFDocumento;Nota Fiscal;"));
+    assert.match(csvDivergencias, /Notebook Core i5/);
+    assert.match(csvDivergencias, /Divergência de Valor/);
+    assert.match(csvDivergencias, /Enquadramento Inválido/);
+  });
+
+  test("extração de itens do NotaSync", () => {
+    const docs = [
+      {
+        chave: "42260111222333000181650010000012341000012345",
+        numero: 1234,
+        empresaNome: "Mercado Modelo",
+        valorTotal: 500,
+        dataEmissao: "2026-02-10T12:00:00Z"
+      }
+    ];
+    const itens = A.extrairItensDeDocumentosNotasync(docs);
+    assert.equal(itens.length, 1);
+    assert.equal(itens[0].empresaNome, "Mercado Modelo");
+    assert.equal(itens[0].bc, 500);
+    const auditado = A.auditarItemReforma(itens[0]);
+    assert.equal(auditado.classificacao, "OK");
+  });
+});

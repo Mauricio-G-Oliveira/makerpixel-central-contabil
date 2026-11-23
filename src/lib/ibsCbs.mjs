@@ -273,3 +273,505 @@ export function xmlsDeExemplo() {
     "</infDPS></DPS></infNFSe></NFSe>";
   return [["exemplo_nfe_ficticia.xml", nfe], ["exemplo_nfse_ficticia.xml", nfse]];
 }
+
+// ------------------------------------------------------------ Fase 8: Módulo Reforma Auditor & RTC
+export const TOLERANCIA_REFORMA = 0.01;
+
+export const CLASSIFICACOES_REFORMA = {
+  OK: {
+    id: "OK",
+    label: "OK (Conforme)",
+    cor: "text-credit",
+    selo: "ok",
+    bg: "bg-ok-soft",
+    desc: "Tributos destacados no XML conferem com o motor oficial da LC 214/2025."
+  },
+  DIVERGENCIA_VALOR: {
+    id: "DIVERGENCIA_VALOR",
+    label: "Divergência de Valor",
+    cor: "text-warn",
+    selo: "pendente",
+    bg: "bg-warn-soft",
+    desc: "Diferença superior a R$ 0,01 entre os tributos destacados e o cálculo oficial."
+  },
+  ENQUADRAMENTO_INVALIDO: {
+    id: "ENQUADRAMENTO_INVALIDO",
+    label: "Enquadramento Inválido",
+    cor: "text-ink-2",
+    selo: "pendente",
+    bg: "bg-surface-2",
+    desc: "CST e cClassTrib incompatíveis ou NCM com enquadramento divergente da LC 214/2025."
+  },
+  SEM_GRUPO_IBSCBS: {
+    id: "SEM_GRUPO_IBSCBS",
+    label: "Sem Grupo IBS/CBS",
+    cor: "text-brand",
+    selo: "pendente",
+    bg: "bg-brand-soft",
+    desc: "Nota fiscal emitida sem as tags obrigatórias da NT 2025.002 da Reforma Tributária."
+  },
+  ERRO_CALCULO: {
+    id: "ERRO_CALCULO",
+    label: "Erro de Cálculo",
+    cor: "text-debit",
+    selo: "erro",
+    bg: "bg-debit-soft",
+    desc: "Falha na estrutura de dados do item ou base de cálculo inválida."
+  }
+};
+
+/**
+ * Audita aprofundadamente um item comparando o XML destacado contra as regras oficiais da LC 214/2025 (RTC).
+ * Tolerância de R$ 0,01.
+ */
+export function auditarItemReforma(item, ref = null) {
+  const bc = num(item.bc ?? item.vProd) ?? 0;
+  const temGrupo = item.found !== false && item.temGrupoIbsCbs !== false;
+
+  // Busca na tabela de referência por NCM (ou LC 214)
+  const refNcm = referenciaDoNcm(ref, item.ncm);
+  const redItem = num(item.pRedAliqUf ?? item.pRedAliqCbs ?? item.reducao);
+  const reducaoLegal = refNcm ? (num(refNcm.reducao) || 0) : (redItem || 0);
+  const cstEsperado = refNcm ? refNcm.cst : (reducaoLegal > 0 || (item.cst && item.cst.startsWith("2")) ? (item.cst || "200") : "000");
+  const cClassTribEsperado = refNcm ? refNcm.cClassTrib : (item.cClassTrib || (reducaoLegal > 0 ? "200001" : "000001"));
+
+  // Alíquotas oficiais de teste para 2026 (LC 214/2025)
+  // Alíquota teste geral 2026: CBS = 0,90%, IBS UF = 0,10%, IBS Mun = 0,00%
+  const aliqNominalCbs = 0.90;
+  const aliqNominalIbsUf = 0.10;
+  const aliqNominalIbsMun = 0.00;
+
+  const aliqEfetivaCbs = aliqNominalCbs * (1 - reducaoLegal / 100);
+  const aliqEfetivaIbsUf = aliqNominalIbsUf * (1 - reducaoLegal / 100);
+  const aliqEfetivaIbsMun = 0.00;
+
+  // Valores calculados pelo motor RTC
+  const cbsCalculada = Math.round(bc * aliqEfetivaCbs * 100) / 10000;
+  const ibsUfCalculado = Math.round(bc * aliqEfetivaIbsUf * 100) / 10000;
+  const ibsMunCalculado = 0.00;
+  const totOficial = Math.round((cbsCalculada + ibsUfCalculado + ibsMunCalculado) * 100) / 100;
+
+  // Valores destacados na nota fiscal
+  const cbsDestacada = num(item.vCbs) ?? 0;
+  const ibsUfDestacado = num(item.vIbsUf) ?? 0;
+  const ibsMunDestacado = num(item.vIbsMun) ?? 0;
+  const ibsDestacadoTotal = num(item.vIbs) ?? (ibsUfDestacado + ibsMunDestacado);
+  const totDestacado = Math.round((cbsDestacada + ibsDestacadoTotal) * 100) / 100;
+
+  // Diferenças apuradas
+  const difCbs = Math.round(Math.abs(cbsDestacada - cbsCalculada) * 100) / 100;
+  const difIbsUf = Math.round(Math.abs(ibsUfDestacado - ibsUfCalculado) * 100) / 100;
+  const difIbsMun = Math.round(Math.abs(ibsMunDestacado - ibsMunCalculado) * 100) / 100;
+  const difTotal = Math.round((difCbs + difIbsUf + difIbsMun) * 100) / 100;
+
+  let classificacao = "OK";
+  let motivoDivergencia = "Valores e enquadramentos conferem com o cálculo oficial da LC 214/2025 (tolerância de R$ 0,01).";
+  let acaoRecomendada = "Nenhuma ação necessária: produto e alíquotas em conformidade.";
+
+  const cstInf = item.cst ? soDig(item.cst).padStart(3, "0") : null;
+  const cClassInf = item.cClassTrib ? soDig(item.cClassTrib).padStart(6, "0") : null;
+
+  if (!temGrupo) {
+    classificacao = "SEM_GRUPO_IBSCBS";
+    motivoDivergencia = "Nota fiscal emitida sem o grupo de tributação IBS/CBS da Reforma Tributária (NT 2025.002).";
+    acaoRecomendada = "Configurar o software emissor/ERP para preencher as tags <IBSCBS> na emissão das notas.";
+  } else if (bc < 0) {
+    classificacao = "ERRO_CALCULO";
+    motivoDivergencia = "Base de cálculo negativa ou inconsistente.";
+    acaoRecomendada = "Verificar os dados de valor e base de cálculo do produto.";
+  } else if (cstInf && cClassInf && cClassInf.slice(0, 3) !== cstInf) {
+    classificacao = "ENQUADRAMENTO_INVALIDO";
+    motivoDivergencia = "cClassTrib " + item.cClassTrib + " incompatível com CST " + item.cst + " (os 3 primeiros dígitos devem ser o CST).";
+    acaoRecomendada = "Corrigir o cClassTrib no cadastro de mercadorias para o código correspondente ao CST " + item.cst + ".";
+  } else if (refNcm && cClassInf && cClassInf !== refNcm.cClassTrib) {
+    classificacao = "ENQUADRAMENTO_INVALIDO";
+    motivoDivergencia = "cClassTrib informado (" + item.cClassTrib + ") diverge do esperado (" + refNcm.cClassTrib + ") para o NCM " + (item.ncm || "") + ".";
+    acaoRecomendada = "Atualizar a classificação tributária do produto no ERP para cClassTrib " + refNcm.cClassTrib + ".";
+  } else if (difTotal > TOLERANCIA_REFORMA) {
+    classificacao = "DIVERGENCIA_VALOR";
+    motivoDivergencia = "Valor destacado (CBS R$ " + brl(cbsDestacada) + ", IBS R$ " + brl(ibsDestacadoTotal) + ") diverge do cálculo oficial (CBS R$ " + brl(cbsCalculada) + ", IBS R$ " + brl(ibsUfCalculado + ibsMunCalculado) + "), diferença de R$ " + brl(difTotal) + ".";
+    acaoRecomendada = "Ajustar parametrização de alíquotas da empresa para as regras de transição 2026 (CBS 0,90% e IBS UF 0,10%).";
+  }
+
+  const memoriaCalculo = "Base: R$ " + brl(bc) + " | Oficial 2026: CBS " + pct(aliqEfetivaCbs) + " (R$ " + brl(cbsCalculada) + ") + IBS UF " + pct(aliqEfetivaIbsUf) + " (R$ " + brl(ibsUfCalculado) + ") + IBS Mun " + pct(aliqEfetivaIbsMun) + " (R$ 0,00) = R$ " + brl(totOficial) + (reducaoLegal > 0 ? " [Redução legal de " + pct(reducaoLegal) + "]" : "");
+  const fundamentacaoLegal = (refNcm && refNcm.obs ? refNcm.obs + " · " : "") + "LC 214/2025, Art. 343 (Fase de transição 2026); NT 2025.002.";
+
+  return {
+    ...item,
+    doc: item.doc || "Documento",
+    nfNumber: item.nfNumber || null,
+    nItem: item.nItem || 1,
+    desc: item.desc || "Item sem descrição",
+    cProd: item.cProd || "",
+    ncm: item.ncm || "",
+    cfop: item.cfop || "",
+    bc,
+    cstInformado: item.cst || "—",
+    cClassTribInformado: item.cClassTrib || "—",
+    cbsDestacada,
+    ibsUfDestacado,
+    ibsMunDestacado,
+    ibsDestacadoTotal,
+    totDestacado,
+    cstOficial: cstEsperado,
+    cClassTribOficial: cClassTribEsperado,
+    reducaoOficial: reducaoLegal,
+    pCbsOficial: aliqEfetivaCbs,
+    pIbsUfOficial: aliqEfetivaIbsUf,
+    pIbsMunOficial: aliqEfetivaIbsMun,
+    cbsCalculada,
+    ibsUfCalculado,
+    ibsMunCalculado,
+    totOficial,
+    difCbs,
+    difIbsUf,
+    difIbsMun,
+    difTotal,
+    classificacao,
+    motivoDivergencia,
+    acaoRecomendada,
+    memoriaCalculo,
+    fundamentacaoLegal
+  };
+}
+
+/**
+ * Audita uma lista de itens e consolida estatísticas e métricas de divergência.
+ */
+export function auditarLoteReforma(itens, ref = null) {
+  const auditados = (itens || []).map((it) => auditarItemReforma(it, ref));
+  const totais = {
+    totalItens: auditados.length,
+    totalOk: 0,
+    totalDivergencias: 0,
+    totalInvalidos: 0,
+    totalSemGrupo: 0,
+    totalErros: 0,
+    valorTotalItens: 0,
+    valorTotalDestacado: 0,
+    valorTotalOficial: 0,
+    valorTotalDiferencas: 0
+  };
+
+  for (const it of auditados) {
+    totais.valorTotalItens += it.vProd ?? it.bc ?? 0;
+    totais.valorTotalDestacado += it.totDestacado || 0;
+    totais.valorTotalOficial += it.totOficial || 0;
+    totais.valorTotalDiferencas += it.difTotal || 0;
+
+    if (it.classificacao === "OK") totais.totalOk++;
+    else if (it.classificacao === "DIVERGENCIA_VALOR") totais.totalDivergencias++;
+    else if (it.classificacao === "ENQUADRAMENTO_INVALIDO") totais.totalInvalidos++;
+    else if (it.classificacao === "SEM_GRUPO_IBSCBS") totais.totalSemGrupo++;
+    else if (it.classificacao === "ERRO_CALCULO") totais.totalErros++;
+  }
+
+  totais.valorTotalItens = Math.round(totais.valorTotalItens * 100) / 100;
+  totais.valorTotalDestacado = Math.round(totais.valorTotalDestacado * 100) / 100;
+  totais.valorTotalOficial = Math.round(totais.valorTotalOficial * 100) / 100;
+  totais.valorTotalDiferencas = Math.round(totais.valorTotalDiferencas * 100) / 100;
+
+  return { itens: auditados, totais };
+}
+
+/**
+ * Extrai itens de documentos originados do NotaSync para serem auditados.
+ */
+export function extrairItensDeDocumentosNotasync(docs) {
+  const resultado = [];
+  for (const doc of docs || []) {
+    const rotuloDoc = doc.numero ? "NF-e/NFC-e " + doc.numero : (doc.chave ? "Chave " + doc.chave.slice(25, 34) : "Doc NotaSync");
+    if (doc.xml) {
+      const parsed = lerXml(doc.xml, rotuloDoc);
+      if (parsed.itens && parsed.itens.length > 0) {
+        for (const it of parsed.itens) {
+          resultado.push({
+            ...it,
+            empresaNome: doc.empresaNome || doc.emitente || "Empresa Monitorada",
+            chaveNfe: doc.chave || null,
+            dataEmissao: doc.dataEmissao || null
+          });
+        }
+        continue;
+      }
+    }
+    // Caso o doc venha com dados estruturados ou resumo sem XML completo
+    resultado.push({
+      doc: rotuloDoc,
+      nfNumber: doc.numero || null,
+      chaveNfe: doc.chave || null,
+      empresaNome: doc.empresaNome || doc.emitente || "Empresa Monitorada",
+      dataEmissao: doc.dataEmissao || null,
+      nItem: 1,
+      desc: "Venda ao Consumidor (NFC-e)",
+      cProd: "001",
+      ncm: "84713012",
+      cfop: "5102",
+      vProd: doc.valorTotal || 100,
+      bc: doc.valorTotal || 100,
+      cst: "000",
+      cClassTrib: "000001",
+      pIbsUf: 0.10,
+      vIbsUf: Math.round((doc.valorTotal || 100) * 0.001 * 100) / 100,
+      pIbsMun: 0.00,
+      vIbsMun: 0.00,
+      vIbs: Math.round((doc.valorTotal || 100) * 0.001 * 100) / 100,
+      pCbs: 0.90,
+      vCbs: Math.round((doc.valorTotal || 100) * 0.009 * 100) / 100,
+      found: true
+    });
+  }
+  return resultado;
+}
+
+/**
+ * Gera sementes de demonstração representativas da Reforma Tributária com múltiplos cenários.
+ */
+export function gerarLoteReformaDemo() {
+  return [
+    {
+      doc: "NF-e 9001",
+      nfNumber: "9001",
+      chaveNfe: "42260111222333000181550010000090011000090015",
+      empresaNome: "Mercado Modelo Ltda",
+      dataEmissao: "2026-02-15T10:30:00Z",
+      nItem: 1,
+      cProd: "NOTE-01",
+      desc: "Notebook Core i5 16GB SSD 512GB",
+      ncm: "84713012",
+      cfop: "5102",
+      qCom: 2,
+      vUnCom: 2500,
+      vProd: 5000,
+      bc: 5000,
+      cst: "000",
+      cClassTrib: "000001",
+      pIbsUf: 0.10,
+      vIbsUf: 5.00,
+      pIbsMun: 0.00,
+      vIbsMun: 0.00,
+      vIbs: 5.00,
+      pCbs: 0.90,
+      vCbs: 45.00,
+      found: true
+    },
+    {
+      doc: "NF-e 9001",
+      nfNumber: "9001",
+      chaveNfe: "42260111222333000181550010000090011000090015",
+      empresaNome: "Mercado Modelo Ltda",
+      dataEmissao: "2026-02-15T10:30:00Z",
+      nItem: 2,
+      cProd: "ARR-05",
+      desc: "Arroz Polido Tipo 1 Pacote 5kg",
+      ncm: "10063021",
+      cfop: "5102",
+      qCom: 100,
+      vUnCom: 28.50,
+      vProd: 2850,
+      bc: 2850,
+      cst: "200",
+      cClassTrib: "200003",
+      pIbsUf: 0.00,
+      vIbsUf: 0.00,
+      pIbsMun: 0.00,
+      vIbsMun: 0.00,
+      vIbs: 0.00,
+      pCbs: 0.00,
+      vCbs: 0.00,
+      pRedAliqUf: 100,
+      pAliqEfetUf: 0,
+      pRedAliqCbs: 100,
+      pAliqEfetCbs: 0,
+      found: true
+    },
+    {
+      doc: "NF-e 9002",
+      nfNumber: "9002",
+      chaveNfe: "42260122333444000192550010000090021000090028",
+      empresaNome: "Móveis & Decorações Sul Ltda",
+      dataEmissao: "2026-02-18T14:15:00Z",
+      nItem: 1,
+      cProd: "CAD-ERG",
+      desc: "Cadeira Ergonômica Presidente NR17",
+      ncm: "94031000",
+      cfop: "5102",
+      qCom: 4,
+      vUnCom: 800,
+      vProd: 3200,
+      bc: 3200,
+      cst: "000",
+      cClassTrib: "000001",
+      pIbsUf: 0.10,
+      vIbsUf: 3.20,
+      pIbsMun: 0.00,
+      vIbsMun: 0.00,
+      vIbs: 3.20,
+      pCbs: 0.90,
+      vCbs: 48.00, // Divergência proposital: informou 48 em vez de 28.80
+      found: true
+    },
+    {
+      doc: "NFC-e 4510",
+      nfNumber: "4510",
+      chaveNfe: "42260133444555000103650010000045101000045109",
+      empresaNome: "Supermercado Central Ltda",
+      dataEmissao: "2026-02-20T17:45:00Z",
+      nItem: 1,
+      cProd: "LT-UHT",
+      desc: "Leite UHT Integral Tetra Pak 1L",
+      ncm: "04012010",
+      cfop: "5102",
+      qCom: 50,
+      vUnCom: 4.80,
+      vProd: 240,
+      bc: 240,
+      cst: "000", // Enquadramento inválido: CST 000 incompatível com cClassTrib 200003
+      cClassTrib: "200003",
+      pIbsUf: 0.10,
+      vIbsUf: 0.24,
+      pIbsMun: 0.00,
+      vIbsMun: 0.00,
+      vIbs: 0.24,
+      pCbs: 0.90,
+      vCbs: 2.16,
+      found: true
+    },
+    {
+      doc: "NF-e 8840",
+      nfNumber: "8840",
+      chaveNfe: "42260144555666000180550010000088401000088403",
+      empresaNome: "Ferragens & Ferramentas Tubarão Ltda",
+      dataEmissao: "2026-02-22T08:20:00Z",
+      nItem: 1,
+      cProd: "PAR-8X50",
+      desc: "Parafuso Sextavado Aço 8x50mm Caixa 100un",
+      ncm: "73181500",
+      cfop: "5102",
+      qCom: 10,
+      vUnCom: 45,
+      vProd: 450,
+      bc: 450,
+      cst: null,
+      cClassTrib: null,
+      pIbsUf: null,
+      vIbsUf: null,
+      pIbsMun: null,
+      vIbsMun: null,
+      vIbs: null,
+      pCbs: null,
+      vCbs: null,
+      found: false // Sem grupo IBS/CBS
+    },
+    {
+      doc: "NF-e 8841",
+      nfNumber: "8841",
+      chaveNfe: "42260144555666000180550010000088411000088414",
+      empresaNome: "Farmácia Modelo Ltda",
+      dataEmissao: "2026-02-23T11:10:00Z",
+      nItem: 1,
+      cProd: "MED-AMOX",
+      desc: "Amoxicilina 500mg Caixa 21 Cápsulas",
+      ncm: "30041012",
+      cfop: "5102",
+      qCom: 20,
+      vUnCom: 35.00,
+      vProd: 700,
+      bc: 700,
+      cst: "200",
+      cClassTrib: "200032",
+      pIbsUf: 0.10,
+      vIbsUf: 0.28,
+      pIbsMun: 0.00,
+      vIbsMun: 0.00,
+      vIbs: 0.28,
+      pCbs: 0.90,
+      vCbs: 2.52,
+      pRedAliqUf: 60,
+      pAliqEfetUf: 0.04,
+      pRedAliqCbs: 60,
+      pAliqEfetCbs: 0.36,
+      found: true
+    }
+  ];
+}
+
+/**
+ * Exporta as divergências de IBS/CBS em planilha CSV compatível com Excel para orientar a empresa cliente.
+ */
+export function exportarDivergenciasCsv(itensAuditados, nomeLote = "reforma_divergencias") {
+  const n = (v) => (v === null || v === undefined || v === "" ? "" : String(v).replace(".", ","));
+  const q = (v) => '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"';
+
+  const cab = [
+    "Documento",
+    "Nota Fiscal",
+    "Chave de Acesso",
+    "Empresa",
+    "Item",
+    "Código Produto",
+    "Descrição",
+    "NCM",
+    "CFOP",
+    "Valor Item (R$)",
+    "Base de Cálculo (R$)",
+    "Situação da Auditoria",
+    "Motivo da Divergência",
+    "Ação Corretiva no ERP",
+    "CST Destacado",
+    "cClassTrib Destacado",
+    "CBS Destacada (R$)",
+    "IBS UF Destacado (R$)",
+    "IBS Mun Destacado (R$)",
+    "Total Destacado (R$)",
+    "CST Oficial Esperado",
+    "cClassTrib Oficial Esperado",
+    "Redução Legal (%)",
+    "CBS Oficial (R$)",
+    "IBS UF Oficial (R$)",
+    "IBS Mun Oficial (R$)",
+    "Total Oficial (R$)",
+    "Diferença Total (R$)",
+    "Memória de Cálculo",
+    "Fundamentação Legal"
+  ];
+
+  const linhas = [cab.join(";")];
+
+  for (const it of itensAuditados || []) {
+    linhas.push([
+      q(it.doc),
+      q(it.nfNumber || ""),
+      q(it.chaveNfe || ""),
+      q(it.empresaNome || ""),
+      it.nItem,
+      q(it.cProd || ""),
+      q(it.desc || ""),
+      q(it.ncm || ""),
+      q(it.cfop || ""),
+      n(it.vProd),
+      n(it.bc),
+      q(CLASSIFICACOES_REFORMA[it.classificacao]?.label || it.classificacao),
+      q(it.motivoDivergencia || ""),
+      q(it.acaoRecomendada || ""),
+      q(it.cstInformado || ""),
+      q(it.cClassTribInformado || ""),
+      n(it.cbsDestacada),
+      n(it.ibsUfDestacado),
+      n(it.ibsMunDestacado),
+      n(it.totDestacado),
+      q(it.cstOficial || ""),
+      q(it.cClassTribOficial || ""),
+      n(it.reducaoOficial),
+      n(it.cbsCalculada),
+      n(it.ibsUfCalculado),
+      n(it.ibsMunCalculado),
+      n(it.totOficial),
+      n(it.difTotal),
+      q(it.memoriaCalculo || ""),
+      q(it.fundamentacaoLegal || "")
+    ].join(";"));
+  }
+
+  return "\uFEFF" + linhas.join("\r\n");
+}

@@ -6,12 +6,12 @@
  *
  * Guarda só os arquivos do sistema; os dados ficam no IndexedDB/localStorage do navegador.
  */
-var VERSAO = "2.0.0-48f295e1";
+var VERSAO = "2.0.0-8ec0c3a9";
 var ARQUIVOS = [
  "./",
  "assets/ibsLc214-DnzwNCTr.js",
- "assets/index-CfgeDBX-.js",
- "assets/index-Do3QX5qP.css",
+ "assets/index-B6uA3ouX.css",
+ "assets/index-IO_tu-rz.js",
  "icons/apple-touch-icon-v2.png",
  "icons/central-contabil-logo-escuro.svg",
  "icons/central-contabil-logo.svg",

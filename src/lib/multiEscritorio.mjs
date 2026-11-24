@@ -17,13 +17,8 @@ export const MODULOS_DISPONIVEIS = [
   { id: "notasync", nome: "NotaSync (SEF/SC & DF-e)", secao: "Fiscal", destaque: true },
   { id: "reforma", nome: "Reforma Tributária (Auditor IBS/CBS & RTC)", secao: "Fiscal", destaque: true },
   { id: "danfse", nome: "DANFSe (Gerador NFS-e WASM)", secao: "Fiscal" },
-  { id: "conciliacao", nome: "Conciliação Bancária com IA", secao: "Contábil" },
-  { id: "integracao", nome: "Integração Contábil", secao: "Contábil" },
-  { id: "vencimentos", nome: "Departamento Cadastro (Alvarás & Certidões)", secao: "Cadastro" },
-  { id: "em-dia", nome: "Em Dia (Fechamento Mensal)", secao: "Operacional" },
-  { id: "fiscal", nome: "Fiscal (ICMS & ISS Municipal)", secao: "Fiscal" },
-  { id: "horas", nome: "Controle de Horas (DP)", secao: "Pessoal" },
-  { id: "lucros", nome: "Distribuição de Lucros & REINF", secao: "Contábil" },
+  { id: "xml-excel", nome: "XML → Excel", secao: "Produtividade" },
+  { id: "em-dia", nome: "Em Dia (Gestão de Obrigações)", secao: "Operacional", destaque: true }
 ];
 
 export const PLANOS_PADRAO = [
@@ -34,7 +29,7 @@ export const PLANOS_PADRAO = [
     limiteUsuarios: 2,
     limiteEmpresas: 20,
     limiteArmazenamentoGb: 5,
-    modulos: ["notasync", "reforma", "danfse", "conciliacao", "integracao", "vencimentos", "em-dia", "fiscal", "horas", "lucros"],
+    modulos: ["notasync", "reforma", "danfse", "xml-excel", "em-dia"],
     destaque: false
   },
   {
@@ -44,7 +39,7 @@ export const PLANOS_PADRAO = [
     limiteUsuarios: 5,
     limiteEmpresas: 60,
     limiteArmazenamentoGb: 20,
-    modulos: ["notasync", "reforma", "danfse", "conciliacao", "integracao", "vencimentos", "em-dia", "fiscal", "horas", "lucros"],
+    modulos: ["notasync", "reforma", "danfse", "xml-excel", "em-dia"],
     destaque: true
   },
   {
@@ -54,7 +49,7 @@ export const PLANOS_PADRAO = [
     limiteUsuarios: 15,
     limiteEmpresas: 180,
     limiteArmazenamentoGb: 100,
-    modulos: ["notasync", "reforma", "danfse", "conciliacao", "integracao", "vencimentos", "em-dia", "fiscal", "horas", "lucros"],
+    modulos: ["notasync", "reforma", "danfse", "xml-excel", "em-dia"],
     destaque: false
   }
 ];
@@ -72,7 +67,7 @@ const ESCRITORIOS_PADRAO = [
     uf: "SC",
     situacao: "ATIVO", // ATIVO | TESTE | VENCIDO | SUSPENSO | ENCERRADO
     planoId: "plano-escritorio-plus",
-    modulos: ["notasync", "reforma", "danfse", "conciliacao", "integracao", "vencimentos", "em-dia", "fiscal", "horas", "lucros"],
+    modulos: ["notasync", "reforma", "danfse", "xml-excel", "em-dia"],
     limiteUsuarios: 15,
     limiteEmpresas: 180,
     limiteArmazenamentoGb: 100,
@@ -83,7 +78,7 @@ const ESCRITORIOS_PADRAO = [
         data: "2026-01-10T08:00:00Z",
         tipo: "CONTRATO_ATIVADO",
         detalhe: "Contrato corporativo 24 meses ativado",
-        modulos: ["notasync", "reforma", "danfse", "conciliacao", "integracao", "vencimentos", "em-dia", "fiscal", "horas", "lucros"],
+        modulos: ["notasync", "reforma", "danfse", "xml-excel", "em-dia"],
         autor: "MakerPixel"
       }
     ],
@@ -102,11 +97,11 @@ const ESCRITORIOS_PADRAO = [
     uf: "SC",
     situacao: "TESTE",
     planoId: "plano-escritorio",
-    modulos: ["notasync", "reforma", "danfse", "conciliacao", "integracao", "vencimentos", "em-dia", "fiscal", "horas", "lucros"],
+    modulos: ["notasync", "reforma", "danfse", "xml-excel", "em-dia"],
     limiteUsuarios: 5,
     limiteEmpresas: 60,
     limiteArmazenamentoGb: 20,
-    observacao: "Teste de avaliação completo v3",
+    observacao: "Teste de avaliação completo v4",
     acessoAte: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
     testeExpiraEm: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
     historico: [
@@ -115,7 +110,7 @@ const ESCRITORIOS_PADRAO = [
         tipo: "TESTE_CRIADO",
         detalhe: "Acesso de teste de 3 dias criado",
         dias: 3,
-        modulos: ["notasync", "reforma", "danfse", "conciliacao", "integracao", "vencimentos", "em-dia", "fiscal", "horas", "lucros"],
+        modulos: ["notasync", "reforma", "danfse", "xml-excel", "em-dia"],
         autor: "MakerPixel"
       }
     ],

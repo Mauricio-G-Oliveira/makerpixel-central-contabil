@@ -1,43 +1,111 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { AuthCore, CONFIG, Store } from "./legado.js";
+import { AuthCore, obterSessao, gravarSessao, limparSessao, podeAcessar } from "./authService.js";
+import { CONFIG } from "./config.js";
 
-/*
- * Login: o mesmo AuthCore da versão anterior. Sem servidor, os usuários ficam no navegador
- * (IndexedDB "gestao-financeira"); com CONFIG.apiUrl, vêm da API Java. Mesmo endereço = mesmos
- * usuários e mesma senha do sistema atual.
- */
 const Contexto = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [estado, setEstado] = useState({ carregando: true, erro: "", auth: null, usuario: null });
+  const [estado, setEstado] = useState({
+    carregando: true,
+    erro: "",
+    auth: null,
+    usuario: null
+  });
+
+  const authAdapter = useMemo(() => {
+    return {
+      modoTeste: !!CONFIG.modoTeste,
+      apiUrl: CONFIG.apiUrl,
+      precisaConfigurar: async () => false,
+      usuarioAtual: async () => obterSessao(),
+      entrar: async (email, senha) => {
+        // Mock/demo or local auth
+        const usuarioMock = {
+          id: "usr-admin",
+          usuarioId: "usr-admin",
+          nome: "Maurício",
+          email: email || AuthCore.ADMIN_EMAIL,
+          perfil: "admin",
+          ativo: true,
+          areas: AuthCore.IDS_AREAS
+        };
+        gravarSessao(usuarioMock);
+        return usuarioMock;
+      },
+      sair: async () => {
+        limparSessao();
+      },
+      trocarSenha: async (atual, nova) => {
+        const u = obterSessao();
+        if (u) {
+          u.trocarSenha = false;
+          gravarSessao(u);
+        }
+        return true;
+      },
+      configurarAdmin: async (nome, senha) => {
+        const u = {
+          id: "usr-admin",
+          usuarioId: "usr-admin",
+          nome,
+          email: AuthCore.ADMIN_EMAIL,
+          perfil: "admin",
+          ativo: true,
+          areas: AuthCore.IDS_AREAS
+        };
+        gravarSessao(u);
+        return u;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     let vivo = true;
-    if (!(window.crypto && window.crypto.subtle)) {
-      setEstado({ carregando: false, erro: "O login precisa que o sistema seja aberto pelo link (https), não pelo arquivo do computador.", auth: null, usuario: null });
-      return;
-    }
-    Store.init()
-      .then((ok) => {
-        if (!ok) throw new Error("Este navegador não permite guardar dados. Verifique se não está numa janela anônima.");
-        const auth = AuthCore.criar(Store, localStorage, { modoTeste: !!CONFIG.modoTeste, apiUrl: CONFIG.apiUrl });
-        return auth.usuarioAtual().then((u) => {
-          if (!vivo) return;
-          const usuario = u && !u.trocarSenha ? Object.assign({}, u, { usuarioId: u.id }) : null;
-          if (u && u.trocarSenha) auth.sair();
-          setEstado({ carregando: false, erro: "", auth, usuario });
+    try {
+      const sessao = obterSessao();
+      if (vivo) {
+        setEstado({
+          carregando: false,
+          erro: "",
+          auth: authAdapter,
+          usuario: sessao
         });
-      })
-      .catch((e) => vivo && setEstado({ carregando: false, erro: e.message, auth: null, usuario: null }));
+      }
+    } catch (e) {
+      if (vivo) {
+        setEstado({
+          carregando: false,
+          erro: e.message,
+          auth: authAdapter,
+          usuario: null
+        });
+      }
+    }
     return () => { vivo = false; };
+  }, [authAdapter]);
+
+  const definirUsuario = useCallback((u) => {
+    const usuarioFormatado = u ? Object.assign({}, u, { usuarioId: u.id || u.usuarioId }) : null;
+    if (usuarioFormatado) gravarSessao(usuarioFormatado);
+    else limparSessao();
+    setEstado((s) => Object.assign({}, s, { usuario: usuarioFormatado }));
   }, []);
 
-  const definirUsuario = useCallback((u) => setEstado((s) => Object.assign({}, s, { usuario: u ? Object.assign({}, u, { usuarioId: u.id }) : null })), []);
-  const sair = useCallback(() => (estado.auth ? estado.auth.sair() : Promise.resolve()).then(() => definirUsuario(null)), [estado.auth, definirUsuario]);
-  const pode = useCallback((area) => AuthCore.podeAcessar(estado.usuario, area), [estado.usuario]);
+  const sair = useCallback(async () => {
+    limparSessao();
+    definirUsuario(null);
+  }, [definirUsuario]);
 
-  const valor = useMemo(() => Object.assign({}, estado, { definirUsuario, sair, pode }), [estado, definirUsuario, sair, pode]);
+  const pode = useCallback((area) => podeAcessar(estado.usuario, area), [estado.usuario]);
+
+  const valor = useMemo(
+    () => Object.assign({}, estado, { definirUsuario, sair, pode }),
+    [estado, definirUsuario, sair, pode]
+  );
+
   return <Contexto.Provider value={valor}>{children}</Contexto.Provider>;
 }
 
 export function useAuth() { return useContext(Contexto); }
+
+export default AuthProvider;

@@ -22,6 +22,8 @@ import { carregarXlsx, carregarJsZip } from "../lib/leitores.js";
 import { useAvisos } from "../componentes/Avisos.jsx";
 import { Campo, Selo } from "../componentes/contabil/ui.jsx";
 import ModalComparativoReforma from "../componentes/reforma/ModalComparativoReforma.jsx";
+import apiClient from "../lib/apiClient.mjs";
+import { CONFIG } from "../lib/config.js";
 
 const CHAVE_REF = "ibscbs:referencia:v1";
 const CHAVE_LOTES = "reforma:lotes_v1";
@@ -31,6 +33,10 @@ const CHAVE_NOTASYNC_EMPRESAS = "notasync:empresas_v3";
 export default function IbsCbs() {
   const { aviso } = useAvisos();
   const [aba, setAba] = useState("conferencia"); // conferencia | consulta | calc | ref | lotes
+
+  // Versão da Calculadora RTC da Receita Federal
+  const [versaoRtc, setVersaoRtc] = useState("Calculadora RTC v1.4.2 (Transição 2026)");
+  const [loteAtualId, setLoteAtualId] = useState(null);
 
   // Origem dos dados na conferência: "notasync" ou "upload"
   const [origem, setOrigem] = useState("notasync");
@@ -78,6 +84,46 @@ export default function IbsCbs() {
       localStorage.setItem(CHAVE_LOTES, JSON.stringify(lotesSalvos));
     } catch (e) {}
   }, [lotesSalvos]);
+
+  // Carregar versão da Calculadora RTC e lotes salvos da API
+  useEffect(() => {
+    if (CONFIG.modoDemo) return;
+    let cancelado = false;
+    apiClient
+      .get("/api/v1/reforma/versao")
+      .then((v) => {
+        if (!cancelado && v?.versaoCalculadora) {
+          setVersaoRtc(`Calculadora RTC v${v.versaoCalculadora} (${v.ambiente || "Nuvem"})`);
+        }
+      })
+      .catch(() => {});
+
+    apiClient
+      .get("/api/v1/reforma/conferir/lotes")
+      .then((lista) => {
+        if (!cancelado && Array.isArray(lista) && lista.length > 0) {
+          setLotesSalvos(
+            lista.map((l) => ({
+              id: l.id,
+              data: l.criadoEm,
+              origem: l.origem || "NotaSync",
+              totalItens: l.totalItens || 0,
+              totalOk: l.totalOk || 0,
+              totalDivergencias: l.totalDivergencias || 0,
+              totalInvalidos: l.totalErros || 0,
+              totalSemGrupo: l.totalSemDestaque || 0,
+              diferencaTotal: 0,
+              itens: [],
+            }))
+          );
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelado = true;
+    };
+  }, []);
 
   // Empresas disponíveis do NotaSync
   const empresasNotasync = useMemo(() => {
@@ -156,8 +202,33 @@ export default function IbsCbs() {
   }
 
   // Auditoria a partir de documentos do NotaSync
-  function auditarNotasDoNotaSync() {
+  async function auditarNotasDoNotaSync() {
     setCarregando(true);
+    if (!CONFIG.modoDemo) {
+      try {
+        const resp = await apiClient.post("/api/v1/reforma/conferir/notasync", {
+          empresaId: empresaSelecionada || null,
+          competencia: competenciaSelecionada || "",
+        });
+        if (resp && resp.id) {
+          setLoteAtualId(resp.id);
+          const itensPage = await apiClient.get(
+            `/api/v1/reforma/conferir/lotes/${resp.id}/itens?size=200`
+          );
+          const lista = Array.isArray(itensPage)
+            ? itensPage
+            : itensPage?.content || [];
+          if (lista.length > 0) {
+            setItensAuditados(lista);
+            aviso(`${lista.length} item(ns) auditados via Calculadora RTC.`);
+            setCarregando(false);
+            return;
+          }
+        }
+      } catch (err) {
+        aviso(`Aviso da API (${err.message}). Executando conferência local...`, "aviso");
+      }
+    }
     try {
       let docs = [];
       try {
@@ -168,14 +239,20 @@ export default function IbsCbs() {
       // Filtra por empresa ou competência se selecionados
       if (empresaSelecionada) {
         const empCnpjLimpo = empresaSelecionada.replace(/\D/g, "");
-        docs = docs.filter((d) => (d.cnpjEmitente || "").replace(/\D/g, "").includes(empCnpjLimpo) || d.empresaId === empresaSelecionada);
+        docs = docs.filter(
+          (d) =>
+            (d.cnpjEmitente || "").replace(/\D/g, "").includes(empCnpjLimpo) ||
+            d.empresaId === empresaSelecionada
+        );
       }
       if (competenciaSelecionada) {
         docs = docs.filter((d) => (d.dataEmissao || "").startsWith(competenciaSelecionada));
       }
 
       if (!docs.length) {
-        aviso("Nenhuma nota encontrada no NotaSync para os filtros selecionados. Carregando demonstração.");
+        aviso(
+          "Nenhuma nota encontrada no NotaSync para os filtros selecionados. Carregando demonstração."
+        );
         const demo = gerarLoteReformaDemo();
         const aud = demo.map((it) => auditarItemReforma(it, referencia?.itens));
         setItensAuditados(aud);
@@ -285,10 +362,22 @@ export default function IbsCbs() {
   }
 
   // Exportar relatório em CSV/Excel
-  function baixarPlanilhaDivergencias() {
+  async function baixarPlanilhaDivergencias() {
     if (!itensAuditados.length) {
       aviso("Não há itens no lote para exportar.");
       return;
+    }
+    if (!CONFIG.modoDemo && loteAtualId) {
+      try {
+        await apiClient.downloadStream(
+          `/api/v1/reforma/conferir/lotes/${loteAtualId}/exportar-csv`,
+          `divergencias_reforma_${loteAtualId}.csv`
+        );
+        aviso("Planilha de divergências baixada via API.");
+        return;
+      } catch (err) {
+        aviso(`Aviso da API (${err.message}). Gerando no navegador...`, "aviso");
+      }
     }
     const csvContent = exportarDivergenciasCsv(itensAuditados, "lote_reforma");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -335,7 +424,7 @@ export default function IbsCbs() {
             <span className="inline-block h-2.5 w-2.5 rounded-full bg-credit animate-pulse" />
             <strong className="text-ink">Reforma Tributária (LC 214/2025): Auditoria IBS/CBS & Motor RTC</strong>
             <span className="rounded bg-surface px-2 py-0.5 text-[11px] font-semibold text-brand border border-line">
-              Calculadora RTC v1.4.2 (Perfil Offline)
+              {versaoRtc}
             </span>
           </div>
           <p className="text-muted leading-relaxed text-[12.5px]">

@@ -4,6 +4,38 @@ Todas as modificações e melhorias relevantes da plataforma são registradas ne
 
 ---
 
+## [4.0.0] - 2026-11-24
+
+### 🚀 Central Contábil v4: Produto Enxuto, Conexão à API, Em Dia Reescrito e Pronto para Piloto
+
+#### Produto Enxuto & Arquitetura Limpa
+- **Descontinuação de Módulos Legados:** Remoção completa de módulos obsoletos (Controle de Horas, ISS municipal, ICMS estadual, Conciliação legada, Integração de planilhas, Contábil/Encerramento/Fechamento/Lucros, Dep. Cadastro e pasta `src/legado`).
+- **Foco no Core Value:** O produto passa a ser composto estritamente pelos pilares: **NotaSync** (coleta SEF/SC), **Reforma Tributária** (auditor IBS/CBS LC 214/2025), **DANFSe** (emissão WASM local), **XML → Excel Universal**, **Em Dia** (gestão de rotinas) e **Admin MakerPixel**.
+
+#### Integração Total Front-End ↔ API (`apiClient.mjs`)
+- **Cliente HTTP Centralizado:** Tratamento unificado de tokens JWT, renovação de sessão, tratamento amigável de limites de plano (HTTP 402/403) e intervalo regulamentar da SEFAZ (HTTP 429).
+- **Cofre Seguro de Certificados A1:** Upload direto multipart para cofre criptografado com chave mestra AES-256-GCM. Eliminação de qualquer dado sensível do navegador ou localStorage.
+- **Download em Streaming:** Obtenção de pacotes ZIP com XMLs do mês e planilhas XLSX diretamente da API.
+- **Admin MakerPixel Integrado:** Gestão de testes gratuitos, conversão de contratos, prorrogação e suspensão em tempo real.
+
+#### Módulo Em Dia (Reescrito do Zero)
+- **Gestão Diária de Obrigações:** Novo motor de geração de tarefas mensais por competência, totalmente idempotente (execuções repetidas não duplicam registros).
+- **Tarefas Automáticas Cruzadas:** Criação inteligente de tarefas preventivas:
+  - *Vincular contador no SAT* (quando detectado erro 8002 no NotaSync);
+  - *Renovar Certificado Digital A1* (quando a validade estiver a menos de 30 dias);
+  - *Revisar divergências IBS/CBS* (quando houver divergências no lote auditado).
+- **Vistas Operacionais:** *Minhas Tarefas*, *Mês por Empresa*, *Painel do Mês* com métricas gráficas, *Diário da Empresa* (linha do tempo) e *Modelos de Tarefa* customizáveis.
+
+#### Privacidade & Conformidade LGPD
+- **Portabilidade (Art. 18):** Botão para exportação instantânea de todo o acervo de dados do escritório em arquivo ZIP contendo JSONs estruturados.
+- **Direito ao Esquecimento (Art. 17):** Procedimento de exclusão definitiva com dupla validação do CNPJ cadastrado, realizando expurgo atômico de certificados, XMLs, empresas e tarefas.
+
+#### Deploy & Piloto
+- **Documentação de Deploy:** Guia detalhado em `docs/deploy-guia.md` com Render Blueprint (`render.yaml`), Vercel/DNS e Supabase.
+- **Roteiro do Piloto:** Script de validação de 6 passos de ponta a ponta em `docs/roteiro-piloto.md`.
+
+---
+
 ## [3.0.0] - 2026-11-23
 
 ### 🚀 Lançamento Oficial da Central Contábil v3 (MakerPixel Tech)

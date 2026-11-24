@@ -1,563 +1,920 @@
-import { useEffect, useMemo, useState } from "react";
-import { Core, Importacao, Inicio } from "../lib/legado.js";
-import { ATALHOS_MESES, VENCE_DEPOIS, ehMesmaPessoa, textoRegra } from "../lib/emDia.mjs";
-import { MESES, REGIMES, TIPOS_LUCRO_REAL } from "../lib/depCadastro.mjs";
-import { carregarXlsx } from "../lib/leitores.js";
-import { useEmDia } from "../lib/useEmDia.js";
-import { useAuth } from "../lib/auth.jsx";
-import { lerBuffer, lerPlanilha } from "../lib/leitores.js";
-import { useAvisos } from "../componentes/Avisos.jsx";
-import Janela from "../componentes/Janela.jsx";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import Icone from "../componentes/Icone.jsx";
-import { BotaoArquivo, Campo, Segmentado, TextoRapido, dataBR, numero } from "../componentes/contabil/ui.jsx";
+import { Selo } from "../componentes/contabil/ui.jsx";
+import Janela from "../componentes/Janela.jsx";
+import { useAvisos } from "../componentes/Avisos.jsx";
+import apiClient from "../lib/apiClient.mjs";
+import { CONFIG } from "../lib/config.js";
+import {
+  SETORES,
+  STATUS_TAREFA,
+  gerarModelosPadraoDemo,
+  gerarEmpresasEmDiaDemo,
+  gerarMesIdempotente,
+  gerarTarefasAutomaticas,
+  calcularMetricasPainel,
+  agruparMinhasTarefas
+} from "../lib/emDia.mjs";
 
-/*
- * Em Dia (simples): o que cada um faz no mês. Uma grade por setor, com as empresas nas linhas e as
- * obrigações nas colunas; um clique muda a situação (Pendente → Feito → Não se aplica).
- * Abas pequenas para a passagem de bastão e o diário. Regras em src/lib/emDia.mjs.
- */
-const PROXIMO = { "": "feito", feito: "na", na: "" };
-const CELULA = {
-  "": "bg-warn-soft text-warn border-warn/30", feito: "bg-ok-soft text-credit border-credit/30", na: "bg-surface-2 text-muted border-line",
-  atrasada: "bg-debit-soft text-debit border-debit/30"
-};
-const ROTULO = { "": "Pendente", feito: "Feito", na: "N/A" };
-const memoria = { aba: "grade", setor: "", mes: "" };
+const MES_ATUAL = new Date().toISOString().slice(0, 7);
 
-function mesTexto(m) { return Importacao.nomeCompetencia(m).replace(" de ", "/"); }
-function somarMes(m, n) { const [a, b] = m.split("-").map(Number); const d = new Date(a, b - 1 + n, 1); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"); }
-
-// ---------------------------------------------------------------- colunas do setor (e a regra de cada uma)
-const NUMS = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"];
-function JanelaColunas({ setor, aoFechar }) {
-  const [svc] = useEmDia();
+export default function EmDia() {
   const { aviso } = useAvisos();
-  const [lista, setLista] = useState(() => setor.obrigacoes.map((o) => {
-    const r = setor.regras[o] || {};
-    return { nome: o, codigo: r.codigo || "", meses: (r.meses || []).slice(), regimes: (r.regimes || []).slice(), lucroReal: r.lucroReal || "", inicio: r.inicio || "",
-      venc: r.venc ? { dia: r.venc.dia, depois: r.venc.depois } : { dia: "", depois: 1 }, ativa: r.ativa !== false };
-  }));
-  const [aberta, setAberta] = useState(-1);
-  const [erro, setErro] = useState("");
-  const salvar = () => { try { svc.salvarObrigacoes(setor.id, lista); aviso("Obrigações de " + setor.nome + " atualizadas."); aoFechar(); } catch (e) { setErro(e.message); } };
-  const mover = (i, d) => setLista((l) => { const n = l.slice(); const j = i + d; if (j < 0 || j >= n.length) return n; [n[i], n[j]] = [n[j], n[i]]; return n; });
-  const muda = (i, campo, v) => setLista((l) => l.map((x, k) => (k === i ? Object.assign({}, x, { [campo]: v }) : x)));
-  const alterna = (i, campo, v) => setLista((l) => l.map((x, k) => (k !== i ? x : Object.assign({}, x, { [campo]: x[campo].includes(v) ? x[campo].filter((y) => y !== v) : x[campo].concat(v) }))));
-  const chip = (on) => "rounded-full border px-2 py-0.5 text-[12px] " + (on ? "bg-brand-soft border-brand text-brand font-semibold" : "border-line text-ink-2");
-  return (
-    <Janela aberta titulo={"Obrigações de " + setor.nome} aoFechar={aoFechar} largura="max-w-[720px]"
-      rodape={<><button type="button" className="btn-fantasma" onClick={aoFechar}>Cancelar</button><button type="button" className="btn-primario" onClick={salvar}>Salvar</button></>}>
-      <p className="text-[13px] text-muted">Cada obrigação ativa vira uma coluna da grade. Em Regras: em que meses vale, para quais regimes, desde quando e o vencimento. Onde não vale a célula fica com um traço; passado o vencimento, a pendência fica vermelha.</p>
-      <ul className="space-y-2">
-        {lista.map((o, i) => {
-          const resumo = textoRegra(Object.assign({}, o, { venc: o.venc.dia ? o.venc : null }));
-          return (
-            <li key={i} className={"rounded-lg border border-line p-2.5 space-y-2 " + (o.ativa ? "" : "opacity-60")}>
-              <div className="flex gap-1.5 items-center">
-                <input value={o.nome} onChange={(e) => muda(i, "nome", e.target.value)} aria-label={"Obrigação " + (i + 1)} className="h-9 font-medium" />
-                <input value={o.codigo} onChange={(e) => muda(i, "codigo", e.target.value)} aria-label={"Código de " + o.nome} placeholder="Código" className="h-9 w-[90px] text-[13px]" />
-                <button type="button" className="btn-fantasma h-9 w-9 p-0" onClick={() => mover(i, -1)} aria-label="Subir" title="Subir">↑</button>
-                <button type="button" className="btn-fantasma h-9 w-9 p-0" onClick={() => mover(i, 1)} aria-label="Descer" title="Descer">↓</button>
-                <button type="button" className="btn-perigo h-9 w-9 p-0" onClick={() => setLista((l) => l.filter((_, k) => k !== i))} aria-label={"Tirar " + (o.nome || "obrigação")} title="Tirar"><Icone nome="fechar" /></button>
-              </div>
-              <div className="flex flex-wrap items-center gap-2 text-[12.5px]">
-                <button type="button" className="btn-contorno btn-sm" aria-expanded={aberta === i} onClick={() => setAberta(aberta === i ? -1 : i)}>Regras</button>
-                <span className="text-muted flex-1 min-w-0 truncate">{resumo || "todo mês, todos os regimes, sem vencimento"}</span>
-                <label className="inline-flex items-center gap-1.5"><input type="checkbox" checked={o.ativa} onChange={(e) => muda(i, "ativa", e.target.checked)} /> Ativa</label>
-              </div>
-              {aberta === i && (
-                <div className="space-y-2.5 rounded-md bg-surface-2 p-2.5 text-[12.5px]">
-                  <div className="flex flex-wrap items-center gap-1" role="group" aria-label={"Meses de " + o.nome}>
-                    <span className="text-muted w-[70px]">Meses</span>
-                    {ATALHOS_MESES.map((a) => <button key={a.id} type="button" className={chip(o.meses.join() === a.meses.join())} onClick={() => muda(i, "meses", a.meses.slice())}>{a.nome}</button>)}
-                    <span className="mx-1 text-muted">ou</span>
-                    {NUMS.map((m, k) => <button key={m} type="button" aria-pressed={o.meses.includes(m)} className={chip(o.meses.includes(m))} onClick={() => alterna(i, "meses", m)}>{MESES[k]}</button>)}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-1" role="group" aria-label={"Regimes de " + o.nome}>
-                    <span className="text-muted w-[70px]">Regimes</span>
-                    {REGIMES.map((r) => <button key={r} type="button" aria-pressed={o.regimes.includes(r)} onClick={() => alterna(i, "regimes", r)} className={chip(o.regimes.includes(r))}>{r}</button>)}
-                    {!o.regimes.length && <span className="text-muted ml-1">(nenhum = todos)</span>}
-                  </div>
-                  {(o.regimes.includes("Lucro Real") || !o.regimes.length) && (
-                    <label className="flex items-center gap-2"><span className="text-muted w-[70px]">Lucro Real</span>
-                      <select value={o.lucroReal} onChange={(e) => muda(i, "lucroReal", e.target.value)} aria-label={"Tipo do Lucro Real de " + o.nome} className="h-8 w-auto text-[12.5px]">
-                        <option value="">trimestral e anual</option>{TIPOS_LUCRO_REAL.map((t) => <option key={t} value={t}>só {t.toLowerCase()}</option>)}</select></label>
-                  )}
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-muted w-[70px]">Vence</span>
-                    <select value={o.venc.dia === "util" ? "util" : o.venc.dia ? "dia" : ""} aria-label={"Vencimento de " + o.nome} className="h-8 w-auto text-[12.5px]"
-                      onChange={(e) => muda(i, "venc", Object.assign({}, o.venc, { dia: e.target.value === "util" ? "util" : e.target.value === "dia" ? 20 : "" }))}>
-                      <option value="">sem vencimento</option><option value="dia">no dia</option><option value="util">no último dia útil</option></select>
-                    {o.venc.dia !== "util" && o.venc.dia !== "" && <input type="number" min="1" max="31" value={o.venc.dia} onChange={(e) => muda(i, "venc", Object.assign({}, o.venc, { dia: e.target.value }))} aria-label={"Dia do vencimento de " + o.nome} className="h-8 w-[70px] text-[12.5px]" />}
-                    {o.venc.dia !== "" && <select value={o.venc.depois} onChange={(e) => muda(i, "venc", Object.assign({}, o.venc, { depois: Number(e.target.value) }))} aria-label={"Mês do vencimento de " + o.nome} className="h-8 w-auto text-[12.5px]">
-                      {VENCE_DEPOIS.map((v) => <option key={v.id} value={v.id}>{v.nome}</option>)}</select>}
-                  </div>
-                  <label className="flex items-center gap-2"><span className="text-muted w-[70px]">Desde</span>
-                    <input type="month" value={o.inicio} onChange={(e) => muda(i, "inicio", e.target.value)} aria-label={"Início de " + o.nome} className="h-8 w-[160px] text-[12.5px]" />
-                    <span className="text-muted">vazio = sempre</span></label>
-                </div>
-              )}
-            </li>
-          );
-        })}
-      </ul>
-      <button type="button" className="btn-contorno btn-sm self-start" onClick={() => { setLista((l) => l.concat({ nome: "", codigo: "", meses: [], regimes: [], lucroReal: "", inicio: "", venc: { dia: "", depois: 1 }, ativa: true })); setAberta(lista.length); }}><Icone nome="mais" />Obrigação</button>
-      {erro && <p className="text-debit text-[13px]" role="alert">{erro}</p>}
-    </Janela>
-  );
-}
+  const [abaAtiva, setAbaAtiva] = useState("minhas-tarefas");
+  const [mesCompetencia, setMesCompetencia] = useState(MES_ATUAL);
+  const [carregando, setCarregando] = useState(false);
 
-// ---------------------------------------------------------------- importar
-function JanelaImportar({ setorAtual, mesAtual, aoFechar }) {
-  const [svc] = useEmDia();
-  const { aviso } = useAvisos();
-  const [lido, setLido] = useState(null);   // { tipo: "entregas"|"controle", linhas, plano }
-  const [setor, setSetor] = useState(setorAtual);
-  const [mes, setMes] = useState(mesAtual);
-  const [status, setStatus] = useState("");
-  const ler = async (file) => {
-    setStatus("Lendo " + file.name + "…"); setLido(null);
+  // Estados locais
+  const [modelos, setModelos] = useState(() => gerarModelosPadraoDemo());
+  const [empresas, setEmpresas] = useState(() => gerarEmpresasEmDiaDemo());
+  const [tarefas, setTarefas] = useState(() => {
+    const demo = gerarMesIdempotente([], gerarEmpresasEmDiaDemo(), gerarModelosPadraoDemo(), MES_ATUAL);
+    return demo.tarefas;
+  });
+
+  // Diário da empresa
+  const [empresaDiarioId, setEmpresaDiarioId] = useState("emp-1");
+  const [anotacoes, setAnotacoes] = useState([
+    {
+      id: "anot-1",
+      empresaId: "emp-1",
+      autor: "Marcos Fiscal",
+      texto: "Cliente enviou notas de entrada em atraso. Lançamento concluído.",
+      criadoEm: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+    },
+    {
+      id: "anot-2",
+      empresaId: "emp-1",
+      autor: "Ana Contábil",
+      texto: "Extrato bancário OFX conferido para conciliação.",
+      criadoEm: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
+    }
+  ]);
+  const [novaAnotacao, setNovaAnotacao] = useState("");
+
+  // Modal Novo/Editar Modelo
+  const [modalModeloAberta, setModalModeloAberta] = useState(false);
+  const [modeloEdicao, setModeloEdicao] = useState(null);
+  const [formModelo, setFormModelo] = useState({
+    nome: "",
+    setor: "FISCAL",
+    diaVencimento: 15,
+    aplicaSimples: true,
+    aplicaLucroPresumido: true,
+    aplicaLucroReal: true,
+    aplicaMei: true,
+    exigeFuncionario: false,
+    tipoEmpresa: "TODOS",
+    ativo: true
+  });
+
+  // Carregar dados da API em modo produção
+  const carregarDadosApi = useCallback(async () => {
+    if (CONFIG.modoDemo) return;
+    setCarregando(true);
     try {
-      const linhas = /\.csv$|\.txt$/i.test(file.name) ? Core.textToRows(Core.decodeText(new Uint8Array(await lerBuffer(file)))) : (await lerPlanilha(file))[0].rows;
-      const ehEntregas = (linhas[0] || []).some((c) => /obriga|tarefa/i.test(String(c)));
-      setLido({ tipo: ehEntregas ? "entregas" : "controle", linhas, arquivo: file.name });
-      setStatus("");
-    } catch (e) { setStatus("Não consegui ler: " + (e.message || e)); }
-  };
-  const plano = useMemo(() => {
-    if (!lido) return null;
-    return lido.tipo === "entregas" ? svc.lerEntregas(lido.linhas) : svc.lerControle(lido.linhas, setor, mes);
-  }, [lido, setor, mes, svc]);
-  const resumo = useMemo(() => {
-    if (!plano || plano.erro) return null;
-    const meses = new Set(), emps = new Set(), setores = new Set();
-    plano.itens.forEach((i) => { meses.add(i.mes); emps.add(i.empresa); setores.add(i.departamento || (svc.setores().find((s) => s.id === i.setor) || {}).nome || i.setor); });
-    return { itens: plano.itens.length, meses: Array.from(meses).sort(), empresas: emps.size, setores: Array.from(setores) };
-  }, [plano, svc]);
-  const importar = () => {
-    const r = svc.aplicarImportacao(plano.itens);
-    aviso("Importado: " + numero(r.marcados) + " situação(ões) marcadas" + (r.empresasNovas ? ", " + r.empresasNovas + " empresa(s) nova(s)" : "") + ".");
-    aoFechar();
-  };
-  return (
-    <Janela aberta titulo="Importar para o Em Dia" aoFechar={aoFechar} largura="max-w-[600px]"
-      rodape={<><button type="button" className="btn-fantasma" onClick={aoFechar}>Cancelar</button>
-        <button type="button" className="btn-primario" disabled={!resumo || !resumo.itens} onClick={importar}>Importar</button></>}>
-      <p className="text-[13.5px] text-ink-2">Aceita o CSV de gestão de entregas (Obrigação, Empresa, Status, Departamento, Responsável, Competência) e a planilha de controle (empresas nas linhas, obrigações nas colunas). O que já está como Feito não é desfeito.</p>
-      <div className="flex items-center gap-3"><BotaoArquivo className="btn-contorno" aceita=".csv,.txt,.xlsx,.xls" aoEscolher={ler}>Escolher arquivo</BotaoArquivo>
-        <span className="text-[13px] text-muted break-all">{lido ? lido.arquivo : "nenhum arquivo escolhido"}</span></div>
-      {status && <p className="text-[13px] text-ink-2">{status}</p>}
-      {lido && lido.tipo === "controle" && (
-        <div className="grid grid-cols-2 gap-3">
-          <Campo rotulo="Setor desta planilha" id="imp-setor"><select id="imp-setor" value={setor} onChange={(e) => setSetor(e.target.value)}>{svc.setores().map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}</select></Campo>
-          <Campo rotulo="Competência" id="imp-mes"><input id="imp-mes" type="month" value={mes} onChange={(e) => setMes(e.target.value)} /></Campo>
-        </div>
-      )}
-      {plano && plano.erro && <p className="text-[13px] text-debit">{plano.erro}</p>}
-      {resumo && (
-        <div className="rounded-lg border border-line px-3 py-2.5 text-[13.5px] space-y-1">
-          <div><strong>{numero(resumo.itens)}</strong> situação(ões) de <strong>{numero(resumo.empresas)}</strong> empresa(s)</div>
-          <div className="text-muted">Competência: {resumo.meses.map(mesTexto).join(", ")} · Setor: {resumo.setores.join(", ")}</div>
-          {plano.obrigacoes && <div className="text-muted">Colunas: {plano.obrigacoes.join(", ")}</div>}
-          {plano.avisos.length > 0 && <div className="text-warn">{plano.avisos.length} linha(s) sem competência ficaram de fora.</div>}
-        </div>
-      )}
-    </Janela>
-  );
-}
+      const [modRes, checkRes, painelRes, minRes] = await Promise.allSettled([
+        apiClient.get("/api/v1/emdia/modelos"),
+        apiClient.get(`/api/v1/emdia/checklist/${mesCompetencia}`),
+        apiClient.get(`/api/v1/emdia/painel/${mesCompetencia}`),
+        apiClient.get("/api/v1/emdia/minhas-tarefas")
+      ]);
 
-// ---------------------------------------------------------------- grade
-function Grade({ setorId, mes, eu }) {
-  const [svc, versao] = useEmDia();
-  const { aviso } = useAvisos();
-  const [pessoa, setPessoa] = useState("");
-  const [pendentes, setPendentes] = useState(false);
-  const [busca, setBusca] = useState("");
-  const [regime, setRegime] = useState("");
-  const [matrizes, setMatrizes] = useState(false);
-  const g = useMemo(() => svc.grade(mes, setorId, { pessoa, pendentes, busca, regime, matrizes }), [svc, mes, setorId, pessoa, pendentes, busca, regime, matrizes, versao]);   // eslint-disable-line
-  const todos = useMemo(() => svc.grade(mes, setorId), [svc, mes, setorId, versao]);   // eslint-disable-line
-  const pessoas = svc.pessoas();
-  const meu = eu ? todos.porPessoa.find((p) => ehMesmaPessoa(p.pessoa, eu)) : null;
-  const alternar = (l, c) => svc.definirStatus(mes, setorId, l.empresa.id, c.obrigacao, PROXIMO[c.status], eu ? eu.nome : "");
-  if (!todos.linhas.length && !todos.ocultas.length) return null;
-  return (
-    <div className="space-y-3">
-      {/* andamento: geral e por pessoa (clicar filtra) */}
-      <section className="cartao p-4 space-y-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <strong className="text-[16px]">{todos.pct}% feito</strong>
-          <span className="text-[13px] text-muted">{numero(todos.feitas)} de {numero(todos.total)} em {todos.setor.nome} · {mesTexto(mes)}</span>
-          {todos.atrasadas > 0 && <span className="text-[13px] font-semibold text-debit">{numero(todos.atrasadas)} atrasada(s)</span>}
-        </div>
-        <div className="h-2 rounded-full bg-warn-soft overflow-hidden"><div className="h-full bg-credit" style={{ width: todos.pct + "%" }} /></div>
-        <div className="flex flex-wrap gap-1.5">
-          <button type="button" onClick={() => setPessoa("")} className={"rounded-full border px-3 py-1 text-[13px] " + (!pessoa ? "bg-brand-soft border-brand text-brand font-semibold" : "border-line")}>Todos</button>
-          {meu && <button type="button" onClick={() => setPessoa(meu.pessoa)} className={"rounded-full border px-3 py-1 text-[13px] " + (pessoa === meu.pessoa ? "bg-brand-soft border-brand text-brand font-semibold" : "border-line")}>Meus · {meu.feitas}/{meu.total}</button>}
-          {todos.porPessoa.filter((p) => p !== meu).map((p) => {
-            const k = p.pessoa === "(sem responsável)" ? "(sem)" : p.pessoa;
-            return <button key={p.pessoa} type="button" onClick={() => setPessoa(k)} className={"rounded-full border px-3 py-1 text-[13px] " + (pessoa === k ? "bg-brand-soft border-brand text-brand font-semibold" : "border-line")}>
-              {p.pessoa} · <span className={p.feitas === p.total ? "text-credit" : ""}>{p.feitas}/{p.total}</span></button>;
-          })}
-        </div>
-      </section>
-      <div className="flex flex-wrap items-center gap-2">
-        <input type="search" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar empresa ou CNPJ…" aria-label="Buscar empresa" className="max-w-[280px] h-9" />
-        <select value={regime} onChange={(e) => setRegime(e.target.value)} aria-label="Regime" className="h-9 w-auto">
-          <option value="">Todos os regimes</option>{REGIMES.map((x) => <option key={x} value={x}>{x}</option>)}<option value="(sem)">Sem regime</option>
-        </select>
-        <label className="inline-flex items-center gap-2 text-[13.5px]"><input type="checkbox" checked={pendentes} onChange={(e) => setPendentes(e.target.checked)} /> Só com pendência</label>
-        <label className="inline-flex items-center gap-2 text-[13.5px]"><input type="checkbox" checked={matrizes} onChange={(e) => setMatrizes(e.target.checked)} /> Só matrizes</label>
-        <span className="text-[12.5px] text-muted ml-auto">Clique na situação para mudar: Pendente → Feito → N/A</span>
-      </div>
-      <div className="cartao overflow-hidden">
-        <div className="overflow-x-auto relative">
-          <table className="w-full text-[13.5px]">
-            <thead className="bg-surface-2 text-left text-[12px] uppercase tracking-wide text-muted">
-              <tr>
-                <th className="px-3 py-2.5 font-semibold min-w-[200px] sticky left-0 bg-surface-2 z-10">Empresa</th>
-                <th className="px-2 py-2.5 font-semibold min-w-[130px]">Responsável</th>
-                {g.setor.obrigacoes.map((o) => {
-                  const regra = textoRegra(g.setor.regras[o]), venc = g.vencimentos[o];
-                  return <th key={o} className="px-2 py-2.5 font-semibold text-center max-w-[130px]" title={o + (regra ? " · " + regra : "")}><span className="block truncate">{o}</span>
-                    {venc && <span className="block truncate normal-case tracking-normal font-normal text-[11px]">vence {dataBR(venc).slice(0, 5)}</span>}</th>;
-                })}
-                <th className="px-2 py-2.5 font-semibold text-center">Situação</th>
-                <th className="px-2 py-2.5 font-semibold min-w-[180px]">Observação</th>
-                <th className="px-1 py-2.5"><span className="sr-only">Ocultar</span></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line">
-              {!g.linhas.length && <tr><td colSpan={g.setor.obrigacoes.length + 5} className="px-3 py-8 text-center text-muted">Nenhuma empresa com esse filtro.</td></tr>}
-              {g.linhas.map((l) => (
-                <tr key={l.empresa.id} className="group hover:bg-surface-2">
-                  <td className="px-3 py-1.5 font-medium sticky left-0 bg-surface group-hover:bg-surface-2 z-10">{l.empresa.nome}</td>
-                  <td className="px-1 py-1"><TextoRapido valor={l.responsavel} lista="emdia-pessoas" rotulo={"Responsável de " + l.empresa.nome} placeholder="—" className="w-[130px]"
-                    aoGravar={(v) => { svc.definirResponsavel(setorId, l.empresa.id, v, mes); aviso("Responsável de " + l.empresa.nome + " a partir de " + mesTexto(mes) + ": " + (v.trim() || "ninguém") + "."); }} /></td>
-                  {l.celulas.map((c) => (
-                    <td key={c.obrigacao} className="px-1.5 py-1 text-center">
-                      {!c.vale ? <span className="text-muted" title={c.obrigacao + " não vale para esta empresa neste mês"}>—</span> : <button type="button" onClick={() => alternar(l, c)} title={c.obrigacao + ": " + ROTULO[c.status] + (c.vencimento ? " · vence " + dataBR(c.vencimento) : "") + (c.por ? " · " + c.por : "") + (c.em ? " em " + dataBR(c.em) : "")}
-                        className={"min-w-[86px] h-7 px-2 rounded-full border text-[12.5px] font-semibold " + CELULA[c.atrasada ? "atrasada" : c.status]}>{c.status === "feito" ? "✓ Feito" : c.atrasada ? "Atrasada" : ROTULO[c.status]}</button>}
-                    </td>
-                  ))}
-                  <td className="px-2 py-1 text-center whitespace-nowrap">{l.completo ? <span className="text-credit font-semibold">✓ OK</span> : <span className="text-muted tabular-nums">{l.feitas}/{l.total}</span>}</td>
-                  <td className="px-1 py-1"><TextoRapido valor={l.obs} rotulo={"Observação de " + l.empresa.nome} placeholder="—" className="w-full min-w-[170px]" aoGravar={(v) => svc.definirObs(mes, setorId, l.empresa.id, v)} /></td>
-                  <td className="px-1 py-1 text-right"><button type="button" onClick={() => svc.ocultar(setorId, l.empresa.id, true)} title={"Não acompanhar esta empresa em " + g.setor.nome}
-                    className="opacity-0 group-hover:opacity-100 focus:opacity-100 btn-fantasma h-7 w-7 p-0" aria-label={"Ocultar " + l.empresa.nome + " deste setor"}><Icone nome="fechar" className="w-4 h-4" /></button></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <datalist id="emdia-pessoas">{pessoas.map((p) => <option key={p} value={p} />)}{eu && !pessoas.includes(eu.nome) && <option value={eu.nome} />}</datalist>
-      </div>
-      {todos.semObrigacao > 0 && <p className="text-[12.5px] text-muted">{todos.semObrigacao} empresa(s) sem nenhuma obrigação de {g.setor.nome} em {mesTexto(mes)} (pelo regime ou pela frequência) ficaram fora da grade.</p>}
-      {todos.ocultas.length > 0 && (
-        <p className="text-[12.5px] text-muted">Fora de {g.setor.nome}: {todos.ocultas.map((c, i) => (
-          <span key={c.id}>{i ? ", " : ""}{c.nome} <button type="button" className="text-brand underline" onClick={() => svc.ocultar(setorId, c.id, false)}>voltar</button></span>))}</p>
-      )}
-    </div>
-  );
-}
+      if (modRes.status === "fulfilled" && Array.isArray(modRes.value)) {
+        setModelos(modRes.value);
+      }
 
-// ---------------------------------------------------------------- ano (JAN a DEZ) e equipe
-/** Cor da célula do mês: concluído, mês de trabalho, atrasado (mês que já passou) ou ainda não começou. */
-function corMes(m, mesTrabalho, c) {
-  if (c.pct === null) return "text-muted";
-  if (c.pct === 100) return "bg-ok-soft text-credit";
-  if (m < mesTrabalho) return "bg-debit-soft text-debit";
-  if (m === mesTrabalho) return "bg-warn-soft text-warn";
-  return c.pct ? "bg-surface-2 text-ink-2" : "text-muted";
-}
-function CelulaMes({ m, mesTrabalho, c, rotulo, aoAbrir }) {
-  const texto = c.pct === null ? "—" : c.pct + "%";
-  return (
-    <td className="px-0.5 py-0.5 text-center">
-      {c.pct === null ? <span className="text-muted" title={rotulo + ": nada a fazer"}>—</span> : (
-        <button type="button" onClick={() => aoAbrir(m)} title={rotulo + ": " + c.feitas + " de " + c.total + " feitas"} aria-label={rotulo + ": " + texto + ", abrir o mês"}
-          className={"w-full min-w-[46px] h-7 rounded-md text-[12.5px] font-semibold tabular-nums hover:ring-1 hover:ring-brand " + corMes(m, mesTrabalho, c)}>{texto}</button>
-      )}
-    </td>
-  );
-}
+      if (checkRes.status === "fulfilled" && Array.isArray(checkRes.value)) {
+        const todasTarefas = [];
+        const empList = [];
+        for (const item of checkRes.value) {
+          empList.push({
+            id: item.empresaId,
+            razaoSocial: item.empresaNome,
+            cnpj: item.empresaCnpj,
+            regime: item.regime
+          });
+          if (Array.isArray(item.tarefas)) {
+            todasTarefas.push(...item.tarefas);
+          }
+        }
+        if (empList.length > 0) setEmpresas(empList);
+        if (todasTarefas.length > 0) setTarefas(todasTarefas);
+      }
+    } catch (err) {
+      aviso("Não foi possível carregar dados da API: " + (err.message || err), "aviso");
+    } finally {
+      setCarregando(false);
+    }
+  }, [mesCompetencia, aviso]);
 
-function Anual({ setorId, ano, eu, aoAbrirMes }) {
-  const [svc, versao] = useEmDia();
-  const { aviso } = useAvisos();
-  const [pessoa, setPessoa] = useState("");
-  const [regime, setRegime] = useState("");
-  const [matrizes, setMatrizes] = useState(false);
-  const [busca, setBusca] = useState("");
-  const a = useMemo(() => svc.anual(ano, setorId, { pessoa, regime, matrizes, busca }), [svc, ano, setorId, pessoa, regime, matrizes, busca, versao]);   // eslint-disable-line
-  const todos = useMemo(() => svc.anual(ano, setorId), [svc, ano, setorId, versao]);   // eslint-disable-line
-  const mesTrabalho = svc.mesPadrao();
-  const meu = eu ? todos.equipe.find((p) => ehMesmaPessoa(p.pessoa, eu)) : null;
-  const curto = (m) => MESES[Number(m.slice(5)) - 1];
-  const baixar = async () => {
-    try {
-      const XLSX = await carregarXlsx();
-      const pct = (c) => (c.pct === null ? "" : c.pct / 100);
-      const cab = (primeiro) => primeiro.concat(a.meses.map(curto), ["Ano"]);
-      const emp = [cab(["Empresa", "CNPJ", "Responsável"])].concat(a.linhas.map((l) => [l.empresa.nome, l.empresa.documento || "", l.responsavel].concat(l.meses.map(pct), [pct(l)])));
-      emp.push(["Total", "", ""].concat(a.totais.map(pct), [pct(a)]));
-      const eq = [cab(["Pessoa"])].concat(a.equipe.map((p) => [p.pessoa].concat(p.meses.map(pct), [pct(p)])));
-      const wb = XLSX.utils.book_new();
-      [[emp, "Empresas"], [eq, "Equipe"]].forEach(([dados, nome]) => {
-        const ws = XLSX.utils.aoa_to_sheet(dados);
-        Object.keys(ws).forEach((k) => { if (k[0] !== "!" && typeof ws[k].v === "number") ws[k].z = "0%"; });
-        XLSX.utils.book_append_sheet(wb, ws, nome);
-      });
-      XLSX.writeFile(wb, "em-dia-" + a.setor.nome.toLowerCase().replace(/[^a-z0-9]+/g, "-") + "-" + ano + ".xlsx");
-    } catch (e) { aviso("Não consegui gerar o Excel: " + (e.message || e)); }
+  useEffect(() => {
+    carregarDadosApi();
+  }, [carregarDadosApi]);
+
+  // Carregar anotações quando muda de empresa
+  useEffect(() => {
+    if (CONFIG.modoDemo || !empresaDiarioId) return;
+    apiClient
+      .get(`/api/v1/emdia/empresas/${empresaDiarioId}/anotacoes`)
+      .then((lista) => {
+        if (Array.isArray(lista)) setAnotacoes(lista);
+      })
+      .catch(() => {});
+  }, [empresaDiarioId]);
+
+  // Disparar geração idempotente do mês
+  const dispararGerarMes = async () => {
+    setCarregando(true);
+    if (!CONFIG.modoDemo) {
+      try {
+        const resp = await apiClient.post("/api/v1/emdia/gerar-mes", {
+          mesCompetencia
+        });
+        aviso(resp.mensagem || "Geração de tarefas concluída com sucesso!");
+        await carregarDadosApi();
+        return;
+      } catch (err) {
+        aviso("Erro ao gerar mês: " + (err.message || err), "erro");
+      } finally {
+        setCarregando(false);
+      }
+    }
+
+    // Modo demonstração
+    const res = gerarMesIdempotente(tarefas, empresas, modelos, mesCompetencia);
+    setTarefas(res.tarefas);
+    setCarregando(false);
+    aviso(
+      `Geração do mês ${mesCompetencia}: ${res.criadas} novas tarefas criadas (${res.existentes} já existiam).`
+    );
   };
-  const chip = (ativo) => "rounded-full border px-3 py-1 text-[13px] " + (ativo ? "bg-brand-soft border-brand text-brand font-semibold" : "border-line");
+
+  // Alterar status de tarefa
+  const alterarStatusTarefa = async (tarefaId, novoStatus) => {
+    if (!CONFIG.modoDemo) {
+      try {
+        await apiClient.patch(`/api/v1/emdia/tarefas/${tarefaId}/status`, {
+          status: novoStatus
+        });
+        setTarefas((prev) =>
+          prev.map((t) =>
+            t.id === tarefaId
+              ? {
+                  ...t,
+                  status: novoStatus,
+                  concluidaEm: novoStatus === "CONCLUIDA" ? new Date().toISOString() : null
+                }
+              : t
+          )
+        );
+        aviso("Status atualizado!");
+        return;
+      } catch (err) {
+        aviso("Erro ao atualizar status: " + (err.message || err), "erro");
+        return;
+      }
+    }
+
+    setTarefas((prev) =>
+      prev.map((t) =>
+        t.id === tarefaId
+          ? {
+              ...t,
+              status: novoStatus,
+              concluidaEm: novoStatus === "CONCLUIDA" ? new Date().toISOString() : null
+            }
+          : t
+      )
+    );
+    aviso("Status da tarefa atualizado.");
+  };
+
+  // Salvar anotação
+  const submeterAnotacao = async (e) => {
+    e.preventDefault();
+    if (!novaAnotacao.trim()) return;
+
+    if (!CONFIG.modoDemo) {
+      try {
+        const resp = await apiClient.post("/api/v1/emdia/anotacoes", {
+          empresaId: empresaDiarioId,
+          texto: novaAnotacao
+        });
+        setAnotacoes([resp, ...anotacoes]);
+        setNovaAnotacao("");
+        aviso("Anotação registrada com sucesso no diário!");
+        return;
+      } catch (err) {
+        aviso("Erro ao salvar anotação: " + (err.message || err), "erro");
+        return;
+      }
+    }
+
+    const nova = {
+      id: `anot-${Date.now()}`,
+      empresaId: empresaDiarioId,
+      autor: "Você",
+      texto: novaAnotacao,
+      criadoEm: new Date().toISOString()
+    };
+    setAnotacoes([nova, ...anotacoes]);
+    setNovaAnotacao("");
+    aviso("Anotação adicionada ao diário.");
+  };
+
+  // Salvar modelo de tarefa
+  const submeterModelo = async (e) => {
+    e.preventDefault();
+    if (!formModelo.nome.trim()) {
+      aviso("Informe o nome da obrigação.", "erro");
+      return;
+    }
+
+    if (!CONFIG.modoDemo) {
+      try {
+        if (modeloEdicao?.id) {
+          const resp = await apiClient.put(`/api/v1/emdia/modelos/${modeloEdicao.id}`, formModelo);
+          setModelos(modelos.map((m) => (m.id === modeloEdicao.id ? resp : m)));
+        } else {
+          const resp = await apiClient.post("/api/v1/emdia/modelos", formModelo);
+          setModelos([...modelos, resp]);
+        }
+        setModalModeloAberta(false);
+        aviso("Modelo de tarefa salvo com sucesso!");
+        return;
+      } catch (err) {
+        aviso("Erro ao salvar modelo: " + (err.message || err), "erro");
+        return;
+      }
+    }
+
+    if (modeloEdicao?.id) {
+      setModelos(modelos.map((m) => (m.id === modeloEdicao.id ? { ...formModelo, id: m.id } : m)));
+    } else {
+      setModelos([
+        ...modelos,
+        { ...formModelo, id: `mod-${Date.now()}` }
+      ]);
+    }
+    setModalModeloAberta(false);
+    aviso("Modelo de tarefa salvo.");
+  };
+
+  // Agrupamentos calculados
+  const tarefasMes = useMemo(() => {
+    return tarefas.filter((t) => (t.mesCompetencia || "").startsWith(mesCompetencia));
+  }, [tarefas, mesCompetencia]);
+
+  const metricas = useMemo(() => {
+    return calcularMetricasPainel(tarefasMes);
+  }, [tarefasMes]);
+
+  const minhasTarefasAgrupadas = useMemo(() => {
+    return agruparMinhasTarefas(tarefasMes);
+  }, [tarefasMes]);
+
   return (
-    <div className="space-y-3">
-      <section className="cartao p-4 space-y-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <strong className="text-[16px]">{todos.pct === null ? 0 : todos.pct}% feito {ano < todos.ate.slice(0, 4) ? "em " + ano : "até " + mesTexto(todos.ate).toLowerCase()}</strong>
-          <span className="text-[13px] text-muted">{numero(todos.feitas)} de {numero(todos.total)} em {todos.setor.nome}{ano > todos.ate.slice(0, 4) ? " (o ano ainda não começou)" : ""}</span>
-          <button type="button" className="btn-contorno btn-sm ml-auto" onClick={baixar}>Baixar Excel</button>
+    <div className="space-y-6">
+      {/* Banner Modo Demonstração */}
+      {CONFIG.modoDemo && (
+        <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 text-xs font-semibold flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span>⚙️</span>
+            <span>Demonstração: dados simulados em memória para o módulo Em Dia.</span>
+          </div>
+          <span className="text-[11px] uppercase tracking-wider font-bold bg-amber-200 dark:bg-amber-900 px-2 py-0.5 rounded">
+            Demonstração
+          </span>
         </div>
-        <div className="flex flex-wrap gap-1.5">
-          <button type="button" onClick={() => setPessoa("")} className={chip(!pessoa)}>Todos</button>
-          {meu && <button type="button" onClick={() => setPessoa(meu.pessoa)} className={chip(pessoa === meu.pessoa)}>Meus</button>}
-          {todos.equipe.filter((p) => p !== meu).map((p) => {
-            const k = p.pessoa === "(sem responsável)" ? "(sem)" : p.pessoa;
-            return <button key={p.pessoa} type="button" onClick={() => setPessoa(k)} className={chip(pessoa === k)}>{p.pessoa}</button>;
-          })}
+      )}
+
+      {/* Cabeçalho */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-line pb-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight text-ink">Em Dia</h1>
+            <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-brand-soft text-brand">
+              v4.0 Produção
+            </span>
+          </div>
+          <p className="text-sm text-muted mt-1">
+            Gestão diária de obrigações: o que cada empresa precisa este mês, quem cuida e o que já foi feito.
+          </p>
         </div>
-      </section>
-      <div className="flex flex-wrap items-center gap-2">
-        <input type="search" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar empresa ou CNPJ…" aria-label="Buscar empresa" className="max-w-[280px] h-9" />
-        <select value={regime} onChange={(e) => setRegime(e.target.value)} aria-label="Regime" className="h-9 w-auto">
-          <option value="">Todos os regimes</option>{REGIMES.map((x) => <option key={x} value={x}>{x}</option>)}<option value="(sem)">Sem regime</option>
-        </select>
-        <label className="inline-flex items-center gap-2 text-[13.5px]"><input type="checkbox" checked={matrizes} onChange={(e) => setMatrizes(e.target.checked)} /> Só matrizes</label>
-        <span className="text-[12.5px] text-muted ml-auto">Clique num mês para abrir a grade dele</span>
+
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-muted">
+            <span>Competência:</span>
+            <input
+              type="month"
+              value={mesCompetencia}
+              onChange={(e) => setMesCompetencia(e.target.value)}
+              className="text-xs font-bold py-1 px-2.5 rounded-lg border border-line bg-surface text-ink"
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={dispararGerarMes}
+            disabled={carregando}
+            className="btn-primario text-xs font-semibold py-1.5 px-3 flex items-center gap-1.5"
+            title="Gerar tarefas do mês de forma idempotente para todas as empresas"
+          >
+            <span>⚡</span>
+            {carregando ? "Gerando..." : "Gerar Mês"}
+          </button>
+        </div>
       </div>
-      <div className="cartao overflow-hidden">
-        <div className="overflow-x-auto relative">
-          <table className="w-full text-[13px]">
-            <thead className="bg-surface-2 text-[12px] uppercase tracking-wide text-muted">
-              <tr>
-                <th className="px-3 py-2.5 font-semibold text-left min-w-[200px] sticky left-0 bg-surface-2 z-10">Empresa</th>
-                <th className="px-2 py-2.5 font-semibold text-left">Responsável</th>
-                {a.meses.map((m) => <th key={m} className={"px-1 py-2.5 font-semibold text-center " + (m === mesTrabalho ? "text-brand" : "")}>{curto(m)}</th>)}
-                <th className="px-2 py-2.5 font-semibold text-center" title="Do começo do ano até o mês de trabalho">Ano</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line">
-              {!a.linhas.length && <tr><td colSpan={15} className="px-3 py-8 text-center text-muted">Nenhuma empresa com esse filtro.</td></tr>}
-              {a.linhas.map((l) => (
-                <tr key={l.empresa.id} className="group hover:bg-surface-2">
-                  <td className="px-3 py-1 font-medium sticky left-0 bg-surface group-hover:bg-surface-2 z-10">{l.empresa.nome}</td>
-                  <td className="px-2 py-1 text-ink-2 whitespace-nowrap">{l.responsavel || <span className="text-muted">—</span>}</td>
-                  {a.meses.map((m, i) => <CelulaMes key={m} m={m} mesTrabalho={mesTrabalho} c={l.meses[i]} rotulo={l.empresa.nome + ", " + mesTexto(m)} aoAbrir={aoAbrirMes} />)}
-                  <td className="px-2 py-1 text-center font-semibold tabular-nums">{l.pct === null ? "—" : l.pct + "%"}</td>
-                </tr>
-              ))}
-            </tbody>
-            {a.linhas.length > 0 && (
-              <tfoot className="bg-surface-2 font-semibold"><tr>
-                <td className="px-3 py-2 sticky left-0 bg-surface-2">Total</td><td />
-                {a.totais.map((t, i) => <td key={i} className="px-1 py-2 text-center tabular-nums">{t.pct === null ? "—" : t.pct + "%"}</td>)}
-                <td className="px-2 py-2 text-center tabular-nums">{a.pct === null ? "—" : a.pct + "%"}</td>
-              </tr></tfoot>
+
+      {/* Abas de Navegação */}
+      <div className="flex gap-2 border-b border-line overflow-x-auto pb-px">
+        {[
+          { id: "minhas-tarefas", label: "Minhas Tarefas", count: minhasTarefasAgrupadas.hoje.length + minhasTarefasAgrupadas.atrasadas.length },
+          { id: "mes-empresa", label: "Mês por Empresa", count: empresas.length },
+          { id: "painel-mes", label: "Painel do Mês" },
+          { id: "diario-empresa", label: "Diário da Empresa" },
+          { id: "modelos", label: "Modelos de Tarefa", count: modelos.length }
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setAbaAtiva(tab.id)}
+            className={`px-4 py-2.5 text-xs sm:text-sm font-semibold border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${
+              abaAtiva === tab.id
+                ? "border-brand text-brand"
+                : "border-transparent text-muted hover:text-ink"
+            }`}
+          >
+            <span>{tab.label}</span>
+            {tab.count !== undefined && (
+              <span className={`text-[11px] px-1.5 py-0.2 rounded-full font-bold ${
+                abaAtiva === tab.id ? "bg-brand/15 text-brand" : "bg-surface-2 text-muted"
+              }`}>
+                {tab.count}
+              </span>
             )}
-          </table>
+          </button>
+        ))}
+      </div>
+
+      {/* ABA 1: MINHAS TAREFAS */}
+      {abaAtiva === "minhas-tarefas" && (
+        <div className="space-y-6">
+          {/* Seção 1: Atrasadas */}
+          {minhasTarefasAgrupadas.atrasadas.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-rose-600 font-bold text-xs uppercase tracking-wider">
+                <span className="w-2 h-2 rounded-full bg-rose-600 animate-ping" />
+                <span>Tarefas Atrasadas ({minhasTarefasAgrupadas.atrasadas.length})</span>
+              </div>
+              <div className="grid grid-cols-1 gap-2.5">
+                {minhasTarefasAgrupadas.atrasadas.map((t) => (
+                  <div key={t.id} className="cartao p-3.5 border-l-4 border-l-rose-500 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-ink text-sm">{t.nome}</span>
+                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-200">
+                          Venceu em {new Date(t.prazo + "T00:00:00").toLocaleDateString("pt-BR")}
+                        </span>
+                      </div>
+                      <div className="text-xs text-muted">
+                        <span>{t.empresaNome}</span> &bull; <span className="font-mono">{t.empresaCnpj}</span> &bull; Setor: <strong>{t.setor}</strong>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <select
+                        value={t.status}
+                        onChange={(e) => alterarStatusTarefa(t.id, e.target.value)}
+                        className="text-xs h-8 px-2 rounded border border-line bg-surface text-ink font-semibold"
+                      >
+                        {STATUS_TAREFA.map((st) => (
+                          <option key={st.id} value={st.id}>{st.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Seção 2: Hoje */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-brand font-bold text-xs uppercase tracking-wider">
+              <span>Para Hoje ({minhasTarefasAgrupadas.hoje.length})</span>
+            </div>
+            {minhasTarefasAgrupadas.hoje.length === 0 ? (
+              <div className="cartao p-4 text-center text-xs text-muted">
+                Nenhuma tarefa com vencimento para hoje.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-2.5">
+                {minhasTarefasAgrupadas.hoje.map((t) => (
+                  <div key={t.id} className="cartao p-3.5 border-l-4 border-l-brand flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-ink text-sm">{t.nome}</span>
+                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-200">
+                          Vence Hoje
+                        </span>
+                      </div>
+                      <div className="text-xs text-muted">
+                        <span>{t.empresaNome}</span> &bull; <span className="font-mono">{t.empresaCnpj}</span> &bull; Setor: <strong>{t.setor}</strong>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <select
+                        value={t.status}
+                        onChange={(e) => alterarStatusTarefa(t.id, e.target.value)}
+                        className="text-xs h-8 px-2 rounded border border-line bg-surface text-ink font-semibold"
+                      >
+                        {STATUS_TAREFA.map((st) => (
+                          <option key={st.id} value={st.id}>{st.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Seção 3: Desta Semana */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-ink-2 font-bold text-xs uppercase tracking-wider">
+              <span>Esta Semana ({minhasTarefasAgrupadas.destaSemana.length})</span>
+            </div>
+            {minhasTarefasAgrupadas.destaSemana.length === 0 ? (
+              <div className="cartao p-4 text-center text-xs text-muted">
+                Nenhuma tarefa agendada para os próximos 7 dias.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-2.5">
+                {minhasTarefasAgrupadas.destaSemana.map((t) => (
+                  <div key={t.id} className="cartao p-3.5 border border-line flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-ink text-sm">{t.nome}</span>
+                        <span className="text-xs text-muted">
+                          Prazo: {new Date(t.prazo + "T00:00:00").toLocaleDateString("pt-BR")}
+                        </span>
+                      </div>
+                      <div className="text-xs text-muted">
+                        <span>{t.empresaNome}</span> &bull; Responsável: <strong>{t.responsavel || "Equipe"}</strong>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <select
+                        value={t.status}
+                        onChange={(e) => alterarStatusTarefa(t.id, e.target.value)}
+                        className="text-xs h-8 px-2 rounded border border-line bg-surface text-ink font-semibold"
+                      >
+                        {STATUS_TAREFA.map((st) => (
+                          <option key={st.id} value={st.id}>{st.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[12.5px] text-muted">
-        <span><span className="inline-block w-3 h-3 rounded-sm bg-ok-soft border border-credit/30 align-middle mr-1" />Concluído</span>
-        <span><span className="inline-block w-3 h-3 rounded-sm bg-warn-soft border border-warn/30 align-middle mr-1" />Mês de trabalho ({mesTexto(mesTrabalho)})</span>
-        <span><span className="inline-block w-3 h-3 rounded-sm bg-debit-soft border border-debit/30 align-middle mr-1" />Mês que já passou, incompleto</span>
-        <span>— nada a fazer no mês</span>
-      </div>
-      {a.equipe.length > 0 && (
-        <section className="cartao overflow-hidden">
-          <h2 className="px-4 pt-3.5 pb-2 text-[15px] font-semibold">Equipe mês a mês</h2>
-          <div className="overflow-x-auto relative">
-            <table className="w-full text-[13px]">
-              <thead className="bg-surface-2 text-[12px] uppercase tracking-wide text-muted">
-                <tr><th className="px-3 py-2.5 font-semibold text-left min-w-[160px]">Pessoa</th>
-                  {a.meses.map((m) => <th key={m} className="px-1 py-2.5 font-semibold text-center">{curto(m)}</th>)}
-                  <th className="px-2 py-2.5 font-semibold text-center">Ano</th></tr>
+      )}
+
+      {/* ABA 2: MÊS POR EMPRESA */}
+      {abaAtiva === "mes-empresa" && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-4">
+            {empresas.map((emp) => {
+              const empTarefas = tarefasMes.filter((t) => t.empresaId === emp.id);
+              const concluidas = empTarefas.filter((t) => t.status === "CONCLUIDA").length;
+              const total = empTarefas.length;
+              const pctConclusao = total > 0 ? Math.round((concluidas / total) * 100) : 0;
+
+              return (
+                <div key={emp.id} className="cartao p-4 space-y-3 border border-line">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-line pb-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-bold text-ink text-sm sm:text-base">{emp.razaoSocial}</h3>
+                        <span className="text-[11px] font-mono text-muted">{emp.cnpj}</span>
+                      </div>
+                      <span className="text-xs text-muted">
+                        Regime: <strong>{emp.regime}</strong> &bull; Responsáveis: Fiscal ({emp.responsavelSetorFiscal || "—"}), DP ({emp.responsavelSetorDp || "—"})
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <span className="text-xs font-bold text-ink">{concluidas}/{total} concluídas</span>
+                        <div className="w-24 bg-surface-2 rounded-full h-2 mt-1 overflow-hidden">
+                          <div
+                            className="bg-brand h-2 rounded-full transition-all"
+                            style={{ width: `${pctConclusao}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {empTarefas.length === 0 ? (
+                    <p className="text-xs text-muted py-2">
+                      Nenhuma tarefa gerada para esta empresa no mês. Clique em "Gerar Mês" no topo.
+                    </p>
+                  ) : (
+                    <div className="divide-y divide-line/60">
+                      {empTarefas.map((t) => {
+                        const ehConcluida = t.status === "CONCLUIDA";
+                        return (
+                          <div key={t.id} className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div className="flex items-center gap-2.5">
+                              <input
+                                type="checkbox"
+                                checked={ehConcluida}
+                                onChange={(e) =>
+                                  alterarStatusTarefa(t.id, e.target.checked ? "CONCLUIDA" : "A_FAZER")
+                                }
+                                className="w-4 h-4 rounded text-brand border-line"
+                              />
+                              <span className={`text-xs font-semibold ${ehConcluida ? "line-through text-muted" : "text-ink"}`}>
+                                {t.nome}
+                              </span>
+                              <span className="text-[11px] px-1.5 py-0.2 rounded font-semibold bg-surface-2 text-muted">
+                                {t.setor}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-3 text-xs">
+                              <span className="text-muted">
+                                Prazo: {new Date(t.prazo + "T00:00:00").toLocaleDateString("pt-BR")}
+                              </span>
+                              <span className="text-muted font-medium">
+                                Resp: {t.responsavel || "—"}
+                              </span>
+                              <select
+                                value={t.status}
+                                onChange={(e) => alterarStatusTarefa(t.id, e.target.value)}
+                                className="text-xs h-7 px-2 rounded border border-line bg-surface text-ink font-semibold"
+                              >
+                                {STATUS_TAREFA.map((st) => (
+                                  <option key={st.id} value={st.id}>{st.label}</option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ABA 3: PAINEL DO MÊS */}
+      {abaAtiva === "painel-mes" && (
+        <div className="space-y-6">
+          {/* Cards KPI */}
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5">
+            <div className="cartao p-4 border-l-4 border-l-brand">
+              <span className="text-xs font-semibold text-muted uppercase">Total Tarefas</span>
+              <div className="text-2xl font-bold mt-1 text-ink">{metricas.totalTarefas}</div>
+              <span className="text-[11px] text-muted">Competência {mesCompetencia}</span>
+            </div>
+            <div className="cartao p-4 border-l-4 border-l-emerald-500">
+              <span className="text-xs font-semibold text-emerald-600 uppercase">Concluídas</span>
+              <div className="text-2xl font-bold mt-1 text-emerald-600">{metricas.concluidas}</div>
+              <span className="text-[11px] text-muted">Obrigações finalizadas</span>
+            </div>
+            <div className="cartao p-4 border-l-4 border-l-indigo-500">
+              <span className="text-xs font-semibold text-indigo-600 uppercase">Em Dia</span>
+              <div className="text-2xl font-bold mt-1 text-indigo-600">{metricas.emDia}</div>
+              <span className="text-[11px] text-muted">No prazo regulamentar</span>
+            </div>
+            <div className="cartao p-4 border-l-4 border-l-rose-500">
+              <span className="text-xs font-semibold text-rose-600 uppercase">Atrasadas</span>
+              <div className="text-2xl font-bold mt-1 text-rose-600">{metricas.atrasadas}</div>
+              <span className="text-[11px] text-muted">Requer ação urgente</span>
+            </div>
+            <div className="cartao p-4 border-l-4 border-l-amber-500">
+              <span className="text-xs font-semibold text-amber-600 uppercase">Aguardando Cliente</span>
+              <div className="text-2xl font-bold mt-1 text-amber-600">{metricas.aguardandoCliente}</div>
+              <span className="text-[11px] text-muted">Dependência externa</span>
+            </div>
+          </div>
+
+          {/* Gráfico / Distribuição por Setor e Responsável */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="cartao p-4 space-y-3">
+              <h3 className="font-bold text-sm text-ink border-b border-line pb-2">
+                Distribuição por Setor
+              </h3>
+              <div className="space-y-2 text-xs">
+                {Object.entries(metricas.porSetor).map(([setor, qtd]) => (
+                  <div key={setor} className="flex items-center justify-between py-1 border-b border-line/40">
+                    <span className="font-semibold text-ink">{setor}</span>
+                    <span className="font-bold text-brand bg-brand-soft px-2 py-0.5 rounded-full">{qtd} tarefas</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="cartao p-4 space-y-3">
+              <h3 className="font-bold text-sm text-ink border-b border-line pb-2">
+                Distribuição por Responsável
+              </h3>
+              <div className="space-y-2 text-xs">
+                {Object.entries(metricas.porResponsavel).map(([resp, qtd]) => (
+                  <div key={resp} className="flex items-center justify-between py-1 border-b border-line/40">
+                    <span className="font-semibold text-ink">{resp}</span>
+                    <span className="font-bold text-indigo-600 bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 rounded-full">{qtd} tarefas</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ABA 4: DIÁRIO DA EMPRESA */}
+      {abaAtiva === "diario-empresa" && (
+        <div className="space-y-4">
+          <div className="cartao p-4 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-line pb-3">
+              <div>
+                <h3 className="font-bold text-sm text-ink">Linha do Tempo e Diário da Empresa</h3>
+                <p className="text-xs text-muted">Histórico de anotações, atendimentos e interações com o cliente.</p>
+              </div>
+
+              <div className="min-w-[240px]">
+                <select
+                  value={empresaDiarioId}
+                  onChange={(e) => setEmpresaDiarioId(e.target.value)}
+                  className="w-full text-xs h-9 px-3 rounded-lg border border-line bg-surface text-ink font-semibold"
+                >
+                  {empresas.map((emp) => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.razaoSocial}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Formulário Nova Anotação */}
+            <form onSubmit={submeterAnotacao} className="space-y-2.5">
+              <textarea
+                rows={3}
+                value={novaAnotacao}
+                onChange={(e) => setNovaAnotacao(e.target.value)}
+                placeholder="Escreva uma nova anotação no diário desta empresa…"
+                className="w-full text-xs p-3 rounded-lg border border-line bg-surface text-ink"
+              />
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  className="btn-primario text-xs font-semibold py-1.5 px-4"
+                >
+                  Adicionar Anotação
+                </button>
+              </div>
+            </form>
+
+            {/* Lista de Anotações */}
+            <div className="space-y-3 pt-2">
+              {anotacoes.length === 0 ? (
+                <p className="text-xs text-muted text-center py-6">
+                  Nenhuma anotação registrada ainda para esta empresa.
+                </p>
+              ) : (
+                anotacoes.map((anot) => (
+                  <div key={anot.id} className="p-3.5 rounded-lg border border-line bg-surface-2/40 space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-ink">{anot.autor}</span>
+                      <span className="text-muted">
+                        {new Date(anot.criadoEm).toLocaleDateString("pt-BR")}{" "}
+                        {new Date(anot.criadoEm).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    </div>
+                    <p className="text-xs text-ink-2 whitespace-pre-line leading-relaxed">
+                      {anot.texto}
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ABA 5: MODELOS DE TAREFA */}
+      {abaAtiva === "modelos" && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted">
+              Configure as obrigações que devem ser geradas automaticamente para as empresas conforme o regime.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setModeloEdicao(null);
+                setFormModelo({
+                  nome: "",
+                  setor: "FISCAL",
+                  diaVencimento: 15,
+                  aplicaSimples: true,
+                  aplicaLucroPresumido: true,
+                  aplicaLucroReal: true,
+                  aplicaMei: true,
+                  exigeFuncionario: false,
+                  tipoEmpresa: "TODOS",
+                  ativo: true
+                });
+                setModalModeloAberta(true);
+              }}
+              className="btn-primario text-xs font-semibold py-1.5 px-3 flex items-center gap-1.5"
+            >
+              + Novo Modelo
+            </button>
+          </div>
+
+          <div className="cartao overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-line bg-surface-2/60 text-muted uppercase tracking-wider font-semibold">
+                  <th className="py-3 px-4">Obrigação</th>
+                  <th className="py-3 px-4">Setor</th>
+                  <th className="py-3 px-4 text-center">Dia Venc.</th>
+                  <th className="py-3 px-4 text-center">Regimes Aplicáveis</th>
+                  <th className="py-3 px-4 text-center">Exige Funcionário</th>
+                  <th className="py-3 px-4 text-right">Ação</th>
+                </tr>
               </thead>
               <tbody className="divide-y divide-line">
-                {a.equipe.map((p) => (
-                  <tr key={p.pessoa}>
-                    <td className="px-3 py-1 font-medium">{p.pessoa}</td>
-                    {a.meses.map((m, i) => <CelulaMes key={m} m={m} mesTrabalho={mesTrabalho} c={p.meses[i]} rotulo={p.pessoa + ", " + mesTexto(m)} aoAbrir={aoAbrirMes} />)}
-                    <td className="px-2 py-1 text-center font-semibold tabular-nums">{p.pct === null ? "—" : p.pct + "%"}</td>
+                {modelos.map((m) => (
+                  <tr key={m.id} className="hover:bg-surface-2/40 transition-colors">
+                    <td className="py-3 px-4 font-semibold text-ink">{m.nome}</td>
+                    <td className="py-3 px-4 font-medium text-brand">{m.setor}</td>
+                    <td className="py-3 px-4 text-center font-bold">Dia {m.diaVencimento}</td>
+                    <td className="py-3 px-4 text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        {m.aplicaSimples && <span className="px-1.5 py-0.2 rounded bg-surface-2 text-ink-2 font-mono">Simples</span>}
+                        {m.aplicaLucroPresumido && <span className="px-1.5 py-0.2 rounded bg-surface-2 text-ink-2 font-mono">Presumido</span>}
+                        {m.aplicaLucroReal && <span className="px-1.5 py-0.2 rounded bg-surface-2 text-ink-2 font-mono">Real</span>}
+                        {m.aplicaMei && <span className="px-1.5 py-0.2 rounded bg-surface-2 text-ink-2 font-mono">MEI</span>}
+                      </div>
+                    </td>
+                    <td className="py-3 px-4 text-center font-medium">
+                      {m.exigeFuncionario ? (
+                        <span className="text-amber-600 font-bold">Sim</span>
+                      ) : (
+                        <span className="text-muted">Não</span>
+                      )}
+                    </td>
+                    <td className="py-3 px-4 text-right">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setModeloEdicao(m);
+                          setFormModelo({ ...m });
+                          setModalModeloAberta(true);
+                        }}
+                        className="btn-contorno text-xs py-1 px-2 text-brand font-semibold"
+                      >
+                        Editar
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        </section>
+        </div>
       )}
-    </div>
-  );
-}
 
-// ---------------------------------------------------------------- passagem de bastão
-function Bastao({ setorId, mes, setores }) {
-  const [svc, versao] = useEmDia();
-  const { aviso } = useAvisos();
-  const [f, setF] = useState({ de: "", para: "", motivo: "" });
-  const [erro, setErro] = useState("");
-  const hist = useMemo(() => svc.historicoBastao(), [svc, versao]);   // eslint-disable-line
-  const pessoas = svc.pessoas();
-  const passar = () => {
-    try { const r = svc.passarBastao(mes, setorId, f.de, f.para, f.motivo); aviso(r.qtd + " empresa(s) passaram para " + f.para + ".", { desfazer: r.desfazer }); setF({ de: "", para: "", motivo: "" }); setErro(""); }
-    catch (e) { setErro(e.message); }
-  };
-  const nomeSetor = (id) => (setores.find((s) => s.id === id) || { nome: id }).nome;
-  return (
-    <div className="space-y-4 max-w-[900px]">
-      <section className="cartao p-4 sm:p-5 space-y-3">
-        <h2 className="text-[16px] font-semibold">Alguém vai faltar?</h2>
-        <p className="text-[13px] text-muted">As empresas com pendência de quem sai, em {nomeSetor(setorId)} e {mesTexto(mes)}, passam para quem assume. Quando a pessoa voltar, use Devolver.</p>
-        <div className="grid sm:grid-cols-[1fr_1fr_1.4fr_auto] gap-2 items-end">
-          <Campo rotulo="Quem sai" id="b-de"><input id="b-de" list="b-pessoas" value={f.de} onChange={(e) => setF(Object.assign({}, f, { de: e.target.value }))} autoComplete="off" /></Campo>
-          <Campo rotulo="Quem assume" id="b-para"><input id="b-para" list="b-pessoas" value={f.para} onChange={(e) => setF(Object.assign({}, f, { para: e.target.value }))} autoComplete="off" /></Campo>
-          <Campo rotulo="Motivo (opcional)" id="b-mot"><input id="b-mot" value={f.motivo} onChange={(e) => setF(Object.assign({}, f, { motivo: e.target.value }))} placeholder="férias, atestado…" autoComplete="off" /></Campo>
-          <button type="button" className="btn-primario h-10" onClick={passar}>Passar</button>
-        </div>
-        <datalist id="b-pessoas">{pessoas.map((p) => <option key={p} value={p} />)}</datalist>
-        {erro && <p className="text-debit text-[13px]" role="alert">{erro}</p>}
-      </section>
-      <section className="cartao overflow-hidden">
-        <h2 className="px-4 pt-3.5 pb-2 text-[15px] font-semibold">Passagens</h2>
-        {!hist.length ? <p className="px-4 pb-4 text-[13.5px] text-muted">Nenhuma ainda.</p> : (
-          <ul className="divide-y divide-line">
-            {hist.map((b) => (
-              <li key={b.id} className="flex flex-wrap items-center gap-2 px-4 py-2.5 text-[13.5px]">
-                <span className="flex-1 min-w-[240px]"><strong>{b.de}</strong> → <strong>{b.para}</strong> · {b.empresas.length} empresa(s) · {nomeSetor(b.setor)} · {mesTexto(b.mes)}
-                  <span className="block text-[12px] text-muted">{dataBR(b.em)}{b.motivo ? " · " + b.motivo : ""}{b.devolvido ? " · devolvido em " + dataBR(b.devolvido) : ""}</span></span>
-                {!b.devolvido && <button type="button" className="btn-contorno btn-sm" onClick={() => { svc.devolverBastao(b.id); aviso("Empresas devolvidas para " + b.de + "."); }}>Devolver para {b.de}</button>}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-    </div>
-  );
-}
+      {/* Modal Criar/Editar Modelo */}
+      <Janela
+        aberta={modalModeloAberta}
+        aoFechar={() => setModalModeloAberta(false)}
+        titulo={modeloEdicao ? "Editar Modelo de Obrigação" : "Novo Modelo de Obrigação"}
+        largura="max-w-[540px]"
+        rodape={
+          <div className="flex items-center justify-end gap-2 w-full">
+            <button
+              type="button"
+              onClick={() => setModalModeloAberta(false)}
+              className="btn-contorno text-xs py-1.5 px-3"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={submeterModelo}
+              className="btn-primario text-xs font-semibold py-1.5 px-4"
+            >
+              Salvar Modelo
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4 text-xs">
+          <div className="space-y-1">
+            <label className="font-semibold text-muted uppercase tracking-wider block">Nome da Obrigação</label>
+            <input
+              type="text"
+              value={formModelo.nome}
+              onChange={(e) => setFormModelo({ ...formModelo, nome: e.target.value })}
+              placeholder="Ex.: DAS Simples Nacional"
+              className="w-full text-xs h-9 px-3 rounded-lg border border-line bg-surface text-ink font-semibold"
+            />
+          </div>
 
-// ---------------------------------------------------------------- diário
-function Diario({ setorId, eu, setores }) {
-  const [svc, versao] = useEmDia();
-  const { aviso } = useAvisos();
-  const [texto, setTexto] = useState("");
-  const [quem, setQuem] = useState(eu ? eu.nome : "");
-  const [so, setSo] = useState("");
-  const [erro, setErro] = useState("");
-  const grupos = useMemo(() => svc.diario({ pessoa: so }), [svc, so, versao]);   // eslint-disable-line
-  const anotar = (ev) => {
-    ev.preventDefault();
-    try { svc.anotar(quem, setorId, texto); setTexto(""); setErro(""); aviso("Anotado."); } catch (e) { setErro(e.message); }
-  };
-  const nomeSetor = (id) => (setores.find((s) => s.id === id) || { nome: "" }).nome;
-  return (
-    <div className="space-y-4 max-w-[900px]">
-      <form onSubmit={anotar} className="cartao p-4 space-y-2">
-        <label className="rotulo" htmlFor="d-texto">O que fiz hoje / onde parei</label>
-        <textarea id="d-texto" rows={2} value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Ex.: folhas conferidas; parei no FGTS da empresa X." />
-        <div className="flex flex-wrap items-center gap-2">
-          <input value={quem} onChange={(e) => setQuem(e.target.value)} aria-label="Quem" placeholder="Seu nome" className="h-9 max-w-[200px]" />
-          <span className="text-[12.5px] text-muted">em {nomeSetor(setorId)}</span>
-          <button type="submit" className="btn-primario btn-sm ml-auto">Anotar</button>
-        </div>
-        {erro && <p className="text-debit text-[13px]" role="alert">{erro}</p>}
-      </form>
-      <div className="flex flex-wrap gap-1.5">
-        {[""].concat(svc.pessoas()).map((p) => (
-          <button key={p || "todos"} type="button" onClick={() => setSo(p)} className={"rounded-full border px-3 py-1 text-[13px] " + (so === p ? "bg-brand-soft border-brand text-brand font-semibold" : "border-line")}>{p || "Todos"}</button>
-        ))}
-      </div>
-      {!grupos.length && <p className="text-[13.5px] text-muted">Nenhuma anotação nos últimos 30 dias.</p>}
-      {grupos.map((gr) => (
-        <section key={gr.data} className="cartao overflow-hidden">
-          <h3 className="px-4 pt-3 pb-1.5 text-[13px] font-semibold text-muted">{Inicio.dataPorExtenso ? Inicio.dataPorExtenso(gr.data) : dataBR(gr.data)}</h3>
-          <ul className="divide-y divide-line">
-            {gr.itens.map((n) => (
-              <li key={n.id} className="group flex gap-3 px-4 py-2 text-[13.5px]">
-                <strong className="w-[110px] shrink-0 truncate">{n.pessoa}</strong>
-                <span className="flex-1 whitespace-pre-line">{n.texto}{n.setor && <span className="text-[12px] text-muted"> · {nomeSetor(n.setor)}</span>}</span>
-                <button type="button" onClick={() => svc.excluirAnotacao(n.id)} className="opacity-0 group-hover:opacity-100 focus:opacity-100 btn-fantasma h-7 w-7 p-0" aria-label="Excluir anotação"><Icone nome="fechar" className="w-4 h-4" /></button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
-    </div>
-  );
-}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label className="font-semibold text-muted uppercase tracking-wider block">Setor Responsável</label>
+              <select
+                value={formModelo.setor}
+                onChange={(e) => setFormModelo({ ...formModelo, setor: e.target.value })}
+                className="w-full text-xs h-9 px-3 rounded-lg border border-line bg-surface text-ink font-semibold"
+              >
+                {SETORES.map((s) => (
+                  <option key={s.id} value={s.id}>{s.label}</option>
+                ))}
+              </select>
+            </div>
 
-export default function EmDia() {
-  const [svc, versao] = useEmDia();
-  const { usuario } = useAuth();
-  const { aviso, confirmar } = useAvisos();
-  const setores = useMemo(() => svc.setores(), [svc, versao]);   // eslint-disable-line
-  const [aba, setAbaE] = useState(memoria.aba);
-  const [setorId, setSetorE] = useState(memoria.setor && setores.some((s) => s.id === memoria.setor) ? memoria.setor : setores[0].id);
-  const [mes, setMesE] = useState(memoria.mes || svc.mesPadrao());
-  const [janela, setJanela] = useState("");
-  const setAba = (v) => { memoria.aba = v; setAbaE(v); };
-  const setSetor = (v) => { memoria.setor = v; setSetorE(v); };
-  const setMes = (v) => { memoria.mes = v; setMesE(v); };
-  const setor = setores.find((s) => s.id === setorId) || setores[0];
-  const eu = usuario ? { nome: usuario.nome, email: usuario.email } : null;
-  const vazio = !svc.empresas().length;
-  const demo = () => aviso(svc.carregarDemonstracao(Inicio.vencimentosExemplo(svc.hoje()).clientes) ? "Demonstração carregada: responsáveis, situações e anotações fictícias." : "Já há dados: a demonstração só entra quando o Em Dia está vazio.");
-  const limpar = async () => {
-    if (!(await confirmar({ titulo: "Limpar o Em Dia?", perigo: true, botao: "Limpar",
-      texto: "Saem as situações marcadas, os responsáveis, as passagens de bastão e o diário. As empresas e as colunas de cada setor continuam." }))) return;
-    aviso("Em Dia limpo.", { desfazer: svc.limpar() });
-  };
-  return (
-    <div className="space-y-4 max-w-[1500px]">
-      <div className="flex flex-wrap items-center gap-2">
-        {aba === "ano" ? (
-          <div className="inline-flex items-center rounded-lg border border-line bg-surface">
-            <button type="button" className="btn-fantasma h-9 w-9 p-0" onClick={() => setMes(somarMes(mes, -12))} aria-label="Ano anterior">‹</button>
-            <span className="px-2 text-[14px] font-semibold min-w-[80px] text-center">{mes.slice(0, 4)}</span>
-            <button type="button" className="btn-fantasma h-9 w-9 p-0" onClick={() => setMes(somarMes(mes, 12))} aria-label="Próximo ano">›</button>
+            <div className="space-y-1">
+              <label className="font-semibold text-muted uppercase tracking-wider block">Dia de Vencimento</label>
+              <input
+                type="number"
+                min={1}
+                max={31}
+                value={formModelo.diaVencimento}
+                onChange={(e) => setFormModelo({ ...formModelo, diaVencimento: parseInt(e.target.value) || 1 })}
+                className="w-full text-xs h-9 px-3 rounded-lg border border-line bg-surface text-ink font-bold"
+              />
+            </div>
           </div>
-        ) : (
-          <div className="inline-flex items-center rounded-lg border border-line bg-surface">
-            <button type="button" className="btn-fantasma h-9 w-9 p-0" onClick={() => setMes(somarMes(mes, -1))} aria-label="Mês anterior">‹</button>
-            <span className="px-2 text-[14px] font-semibold min-w-[130px] text-center">{mesTexto(mes)}</span>
-            <button type="button" className="btn-fantasma h-9 w-9 p-0" onClick={() => setMes(somarMes(mes, 1))} aria-label="Próximo mês">›</button>
+
+          <div className="space-y-2 pt-2 border-t border-line">
+            <label className="font-semibold text-muted uppercase tracking-wider block">Regimes Aplicáveis</label>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={formModelo.aplicaSimples}
+                  onChange={(e) => setFormModelo({ ...formModelo, aplicaSimples: e.target.checked })}
+                  className="rounded text-brand"
+                />
+                <span>Simples Nacional</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={formModelo.aplicaLucroPresumido}
+                  onChange={(e) => setFormModelo({ ...formModelo, aplicaLucroPresumido: e.target.checked })}
+                  className="rounded text-brand"
+                />
+                <span>Lucro Presumido</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={formModelo.aplicaLucroReal}
+                  onChange={(e) => setFormModelo({ ...formModelo, aplicaLucroReal: e.target.checked })}
+                  className="rounded text-brand"
+                />
+                <span>Lucro Real</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={formModelo.aplicaMei}
+                  onChange={(e) => setFormModelo({ ...formModelo, aplicaMei: e.target.checked })}
+                  className="rounded text-brand"
+                />
+                <span>MEI</span>
+              </label>
+            </div>
           </div>
-        )}
-        <Segmentado pequeno rotulo="Setor" valor={setor.id} aoMudar={setSetor} opcoes={setores.map((s) => [s.id, s.nome])} />
-        <div className="flex-1" />
-        <Segmentado pequeno rotulo="Ver" valor={aba} aoMudar={setAba} opcoes={[["grade", "Mês"], ["ano", "Ano"], ["bastao", "Passagem de bastão"], ["diario", "Diário"]]} />
-      </div>
-      {aba === "grade" && (<>
-        {vazio ? (
-          <div className="cartao p-10 text-center space-y-3">
-            <strong className="block text-[15px]">Nenhuma empresa cadastrada</strong>
-            <span className="block text-[13.5px] text-muted">As empresas são as mesmas do Departamento Cadastro. Importe o CSV de entregas ou a planilha de controle, ou veja como fica com a demonstração.</span>
-            <div className="flex justify-center gap-2"><button type="button" className="btn-primario btn-sm" onClick={() => setJanela("importar")}>Importar</button><button type="button" className="btn-contorno btn-sm" onClick={demo}>Carregar demonstração</button></div>
+
+          <div className="pt-2 border-t border-line">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={formModelo.exigeFuncionario}
+                onChange={(e) => setFormModelo({ ...formModelo, exigeFuncionario: e.target.checked })}
+                className="rounded text-brand"
+              />
+              <span className="font-semibold">Exige que a empresa possua funcionários (ex.: FGTS)</span>
+            </label>
           </div>
-        ) : <Grade setorId={setor.id} mes={mes} eu={eu} />}
-        <div className="flex flex-wrap gap-2 pt-1">
-          <button type="button" className="btn-contorno btn-sm" onClick={() => setJanela("importar")}>Importar CSV ou planilha</button>
-          <button type="button" className="btn-contorno btn-sm" onClick={() => setJanela("colunas")}>Obrigações de {setor.nome}</button>
-          {!vazio && <button type="button" className="btn-fantasma btn-sm" onClick={demo}>Carregar demonstração</button>}
-          <button type="button" className="btn-perigo btn-sm" onClick={limpar}>Limpar</button>
         </div>
-      </>)}
-      {aba === "ano" && (vazio ? <p className="text-[13.5px] text-muted">Nenhuma empresa cadastrada ainda. Veja a aba Mês para importar ou carregar a demonstração.</p>
-        : <Anual setorId={setor.id} ano={mes.slice(0, 4)} eu={eu} aoAbrirMes={(m) => { setMes(m); setAba("grade"); }} />)}
-      {aba === "bastao" && <Bastao setorId={setor.id} mes={mes} setores={setores} />}
-      {aba === "diario" && <Diario setorId={setor.id} eu={eu} setores={setores} />}
-      {janela === "colunas" && <JanelaColunas setor={setor} aoFechar={() => setJanela("")} />}
-      {janela === "importar" && <JanelaImportar setorAtual={setor.id} mesAtual={mes} aoFechar={() => setJanela("")} />}
+      </Janela>
     </div>
   );
 }

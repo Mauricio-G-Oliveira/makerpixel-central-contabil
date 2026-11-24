@@ -1,16 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 
-import { AuthCore, Modulos } from "../lib/legado.js";
 import { useAuth } from "../lib/auth.jsx";
 import { gravarLocal, lerJson, lerLocal, useTema } from "../lib/tema.js";
 import { montarMenu } from "../lib/menu.js";
 import Icone from "./Icone.jsx";
 import Suporte from "./Suporte.jsx";
 import TrocarSenha from "./TrocarSenha.jsx";
-import Competencia from "./contabil/Competencia.jsx";
-import { useContabil } from "../lib/useContabil.js";
-import { useDepCadastro } from "../lib/useDepCadastro.js";
 import { instalarApp, usePwa } from "../lib/pwa.js";
 import {
   escritorioAtivo,
@@ -18,12 +14,12 @@ import {
   statusTeste,
   isSuporteAtivo,
   revogarSuporte,
-  linkContratarWhatsApp,
-  definirEscritorioAtivo
+  linkContratarWhatsApp
 } from "../lib/multiEscritorio.mjs";
+import { CONFIG } from "../lib/config.js";
 
-const VERSAO = "1.0.0";
-const FECHADAS_PADRAO = { "Outras movimentações": 1, "Cadastros": 1 };
+const VERSAO = "4.0.0";
+const FECHADAS_PADRAO = {};
 
 function iniciais(nome) {
   const p = String(nome || "?").trim().split(/\s+/);
@@ -63,16 +59,12 @@ export default function Layout() {
   const [tema, alternarTema] = useTema();
   const local = useLocation();
   const navegar = useNavigate();
-  const ehAdmin = usuario && usuario.perfil === "admin";
-  const [, atualizar] = useState(0);
+  const ehAdmin = usuario && (usuario.perfil === "admin" || usuario.perfil === "ADMIN_PRODUTO");
   const [versaoEscritorio, setVersaoEscritorio] = useState(0);
-  const [, versaoDados] = useContabil();   // conta nova, unidade distribuída: o menu acompanha
-  const [, versaoCad] = useDepCadastro();   // certidão renovada: o número no menu acompanha
-  const secoes = useMemo(() => montarMenu(pode, ehAdmin), [pode, ehAdmin, local.pathname, versaoDados, versaoCad, versaoEscritorio]);   // eslint-disable-line
+  const secoes = useMemo(() => montarMenu(pode, ehAdmin), [pode, ehAdmin, local.pathname, versaoEscritorio]);
   const [fechadas, setFechadas] = useState(() => lerJson("menu:fechadas", FECHADAS_PADRAO));
-  const [integracaoAberta, setIntegracaoAberta] = useState(() => lerLocal("menu:integracao") === "aberta");
   const [recolhido, setRecolhido] = useState(() => lerLocal("menu:recolhido") === "1");
-  const [gaveta, setGaveta] = useState(false);   // menu no celular
+  const [gaveta, setGaveta] = useState(false);
   const [trocarSenha, setTrocarSenha] = useState(false);
   const { auth } = useAuth();
   const { instalar } = usePwa();
@@ -93,40 +85,28 @@ export default function Layout() {
     };
   }, []);
 
-  useEffect(() => {   // sessão: ao voltar para a aba, confere se ainda vale (12 horas sem usar encerram)
+  useEffect(() => {
     const f = () => {
       if (document.visibilityState !== "visible" || !auth) return;
       auth.usuarioAtual().then((u) => { if (!u || u.trocarSenha) sair().then(() => navegar("/login", { replace: true, state: { expirou: true } })); });
     };
     document.addEventListener("visibilitychange", f);
     return () => document.removeEventListener("visibilitychange", f);
-  }, [auth]);   // eslint-disable-line
+  }, [auth]);
 
   const alternarSecao = (t) => setFechadas((f) => { const n = Object.assign({}, f); if (n[t]) delete n[t]; else n[t] = 1; gravarLocal("menu:fechadas", JSON.stringify(n)); return n; });
-  const abrirIntegracao = (sim) => { setIntegracaoAberta(sim); gravarLocal("menu:integracao", sim ? "aberta" : "fechada"); };
   useEffect(() => { gravarLocal("menu:recolhido", recolhido ? "1" : "0"); }, [recolhido]);
-  useEffect(() => {   // entrar na Integração contábil (ou numa conta/cadastro) abre as partes dela
-    if (/^\/(integracao|conta|cadastro)/.test(local.pathname) && !integracaoAberta) abrirIntegracao(true);
-    setGaveta(false);
-  }, [local.pathname]);   // eslint-disable-line
-  useEffect(() => {   // os módulos gravam no navegador: o número no menu acompanha
-    const f = (ev) => { if (ev.key && Modulos.ehDadoDeModulo(ev.key)) atualizar((n) => n + 1); };
-    window.addEventListener("storage", f);
-    return () => window.removeEventListener("storage", f);
-  }, []);
+  useEffect(() => { setGaveta(false); }, [local.pathname]);
 
   const titulo = useMemo(() => {
     for (const s of secoes) for (const i of s.itens) {
       if (local.pathname === i.para) return { sub: s.titulo, titulo: i.label };
-      for (const p of i.partes || []) for (const x of p.itens) if (local.pathname === x.para) return { sub: i.label + " / " + p.titulo, titulo: x.title || x.label };
     }
     return local.pathname === "/" ? { sub: "Visão geral", titulo: "Início" } : { sub: "", titulo: "" };
   }, [secoes, local.pathname]);
   useEffect(() => { document.title = (titulo.titulo ? titulo.titulo + " – " : "") + "Central Contábil"; }, [titulo]);
 
-  const ehTeste = usuario && (usuario.teste || usuario.email === AuthCore.TESTE_EMAIL);
-  const naModulo = local.pathname.indexOf("/modulo/") === 0;
-  const comMes = /^\/(integracao|conta\/)/.test(local.pathname);   // telas que dependem do mês de trabalho
+  const ehTeste = usuario && (usuario.teste || usuario.email === "teste@modo-teste.local");
 
   const menu = (
     <nav aria-label="Menu principal" className="flex flex-col h-full">
@@ -142,28 +122,7 @@ export default function Layout() {
           <Secao key={s.titulo} titulo={s.titulo} aberta={!fechadas[s.titulo]} alternar={() => alternarSecao(s.titulo)} recolhido={recolhido}>
             {s.itens.map((i) => (
               <div key={i.id}>
-                <Item item={i} recolhido={recolhido} contador={i.contador || 0}
-                  extra={i.partes ? (
-                    <span role="button" tabIndex={0} aria-expanded={integracaoAberta} title={integracaoAberta ? "Esconder bancos, unidades e cadastros" : "Mostrar bancos, unidades e cadastros"}
-                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); abrirIntegracao(!integracaoAberta); }}
-                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); abrirIntegracao(!integracaoAberta); } }}
-                      className="-mr-1 h-7 w-7 inline-flex items-center justify-center rounded-md text-muted hover:bg-surface hover:text-ink">
-                      <Icone nome="seta" className={"w-4 h-4 transition-transform " + (integracaoAberta ? "" : "-rotate-90")} /></span>) : null} />
-                {i.partes && integracaoAberta && !recolhido && (
-                  <div className="ml-5 pl-2 border-l border-line my-1">
-                    {i.partes.map((p) => (
-                      <Secao key={p.titulo} titulo={p.titulo} pequena aberta={!fechadas[p.titulo]} alternar={() => alternarSecao(p.titulo)}>
-                        {p.itens.length === 0 && p.vazio && <p className="px-2.5 py-1 text-[12.5px] text-muted">{p.vazio}</p>}
-                        {p.itens.map((x, k) => (
-                          <div key={x.id}>
-                            {x.grupo && (k === 0 || p.itens[k - 1].grupo !== x.grupo) && <p className="px-2.5 pt-1.5 text-[12px] text-muted">{x.grupo}</p>}
-                            <Item item={x} />
-                          </div>
-                        ))}
-                      </Secao>
-                    ))}
-                  </div>
-                )}
+                <Item item={i} recolhido={recolhido} contador={i.contador || 0} />
               </div>
             ))}
           </Secao>
@@ -189,6 +148,19 @@ export default function Layout() {
         </div>
       )}
       <main className="min-w-0 flex flex-col min-h-screen">
+        {/* Faixa de Demonstração */}
+        {CONFIG.modoDemo && (
+          <div className="bg-amber-600 text-white px-4 sm:px-8 py-1.5 text-xs font-semibold flex items-center justify-between gap-3 shadow-sm">
+            <div className="flex items-center gap-2 truncate">
+              <span>⚙️</span>
+              <span className="truncate">Demonstração: dados fictícios em memória (GitHub Pages).</span>
+            </div>
+            <span className="text-[11px] uppercase tracking-wider bg-black/25 px-2 py-0.5 rounded font-mono font-bold shrink-0">
+              Modo Demo
+            </span>
+          </div>
+        )}
+
         {/* Faixa de Teste Gratuito */}
         {stAcesso.emTeste && !stAcesso.vencido && (
           <div className="bg-gradient-to-r from-brand-fill/90 to-brand text-black px-4 sm:px-8 py-2 text-xs sm:text-sm font-semibold flex items-center justify-between gap-3 shadow-sm">
@@ -198,44 +170,36 @@ export default function Layout() {
                 {stAcesso.venceHoje ? "Seu teste gratuito termina hoje!" : `Período de teste gratuito: faltam ${stAcesso.diasRestantes} dia(s) (expira em ${stAcesso.acessoAteFmt}).`}
               </span>
             </div>
-            <a
-              href={linkContratarWhatsApp(escritorio)}
-              target="_blank"
-              rel="noreferrer"
-              className="bg-black text-white hover:bg-black/80 px-3 py-1 rounded-md text-xs font-bold whitespace-nowrap transition-colors"
-            >
-              Quero contratar WhatsApp →
+            <a href={linkContratarWhatsApp(escritorio)} target="_blank" rel="noreferrer" className="bg-black text-white hover:bg-neutral-800 px-3 py-1 rounded text-xs font-bold shrink-0 transition-colors">
+              Ativar Plano Definitivo
             </a>
           </div>
         )}
 
-        {/* Faixa de Contrato Vencendo (<= 7 dias) */}
-        {stAcesso.emContrato && stAcesso.diasRestantes <= 7 && !stAcesso.vencido && (
-          <div className="bg-amber-500 text-black px-4 sm:px-8 py-2 text-xs sm:text-sm font-bold flex items-center justify-between gap-3 shadow-sm">
-            <div className="flex items-center gap-2 truncate">
-              <span className="text-base">⚠️</span>
-              <span className="truncate">
-                {stAcesso.venceHoje
-                  ? `Atenção: seu contrato vence hoje (${stAcesso.acessoAteFmt})!`
-                  : `Seu contrato vence em ${stAcesso.acessoAteFmt} (restam ${stAcesso.diasRestantes} dias).`}
-              </span>
-            </div>
-            <a
-              href={linkContratarWhatsApp(escritorio)}
-              target="_blank"
-              rel="noreferrer"
-              className="bg-black text-white hover:bg-black/80 px-3 py-1 rounded-md text-xs font-bold whitespace-nowrap transition-colors"
-            >
-              Renovar Contrato →
-            </a>
+        {/* Faixa de Teste Expirado */}
+        {stAcesso.vencido && (
+          <div className="bg-debit text-white px-4 sm:px-8 py-2 text-xs sm:text-sm font-bold flex items-center justify-between gap-3">
+            <span>⚠️ O período de teste deste escritório terminou em {stAcesso.acessoAteFmt}.</span>
+            <a href={linkContratarWhatsApp(escritorio)} target="_blank" rel="noreferrer" className="bg-white text-debit px-2.5 py-0.5 rounded text-xs font-bold">Contratar Plano</a>
           </div>
         )}
 
-        {/* Faixa de Suporte 24h */}
+        {/* Faixa de Suporte MakerPixel Ativo */}
         {suporteAtivo && (
-          <div className="bg-amber-500 text-black px-4 sm:px-8 py-1.5 text-xs font-bold flex items-center justify-between gap-3">
-            <span>🛡️ Suporte Central Contábil acessando o escritório (somente leitura · sessão de 24h)</span>
-            <button type="button" onClick={() => { revogarSuporte(); setSuporteAtivo(false); }} className="underline hover:text-white">Encerrar acesso do suporte</button>
+          <div className="bg-purple-950 text-purple-200 border-b border-purple-800 px-4 sm:px-8 py-1.5 text-xs font-semibold flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="inline-block w-2 h-2 rounded-full bg-purple-400 animate-pulse" />
+              <span>Modo Suporte Técnico MakerPixel ativo neste navegador (acesso autorizado pelo cliente).</span>
+            </div>
+            <button
+              onClick={() => {
+                revogarSuporte();
+                setSuporteAtivo(false);
+              }}
+              className="text-xs text-white bg-purple-800 hover:bg-purple-700 px-2 py-0.5 rounded border border-purple-600 font-bold"
+            >
+              Encerrar Suporte
+            </button>
           </div>
         )}
 
@@ -263,81 +227,15 @@ export default function Layout() {
               <span className="max-w-[150px] truncate">{escritorio ? (escritorio.nomeFantasia || escritorio.razaoSocial) : "Central Contábil"}</span>
               <span className="text-[10px] opacity-75">▾</span>
             </Link>
-            {comMes && <Competencia />}
             {ehTeste && <span className="rounded-full bg-brand-soft text-brand text-[12px] font-bold uppercase tracking-wide px-2.5 py-1" title="Você entrou sem senha, no modo de teste.">Modo de teste</span>}
-            <span className="hidden xl:inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1.5 text-[13px] text-muted">
-              <span className="h-2 w-2 rounded-full bg-credit" aria-hidden="true" />Salvo neste navegador</span>
             <button type="button" onClick={alternarTema} className="btn-contorno h-10 w-10 p-0 rounded-full" aria-label={tema === "dark" ? "Ativar tema claro" : "Ativar tema escuro"} title={tema === "dark" ? "Tema claro" : "Tema escuro"}>
               <Icone nome={tema === "dark" ? "sol" : "lua"} /></button>
           </div>
         </header>
-        <div className={"flex-1 min-w-0 " + (naModulo ? "" : "px-4 sm:px-8 py-6 pb-24")}><Outlet context={{ titulo }} /></div>
+        <div className="flex-1 min-w-0 px-4 sm:px-8 py-6 pb-24"><Outlet context={{ titulo }} /></div>
       </main>
+      <Suporte />
       <TrocarSenha aberta={trocarSenha} aoFechar={() => setTrocarSenha(false)} />
-
-      {/* Bloqueio de Acesso Vencido ou Suspenso */}
-      {(stAcesso.vencido || stAcesso.suspenso || stAcesso.encerrado) && (
-        <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4">
-          <div className="cartao p-8 max-w-md w-full bg-surface border-line text-center space-y-4 shadow-2xl">
-            <span className="text-4xl block">⏳</span>
-            <h2 className="text-xl font-bold text-ink">
-              {stAcesso.suspenso
-                ? "Acesso Suspenso"
-                : stAcesso.encerrado
-                ? "Contrato Encerrado"
-                : "Acesso Expirado"}
-            </h2>
-            <p className="text-sm text-muted leading-relaxed">
-              {stAcesso.suspenso ? (
-                <>O acesso do escritório <strong>{escritorio?.razaoSocial || "Contábil"}</strong> está suspenso administrativamente.</>
-              ) : (
-                <>O período de acesso do escritório <strong>{escritorio?.razaoSocial || "Contábil"}</strong> expirou em <span className="text-debit font-semibold">{stAcesso.acessoAteFmt}</span>. Conforme a LGPD, seus dados estão preservados com segurança.</>
-              )}
-            </p>
-            <div className="pt-2 flex flex-col gap-2.5">
-              <a
-                href={linkContratarWhatsApp(escritorio)}
-                target="_blank"
-                rel="noreferrer"
-                className="btn-primario h-11 flex items-center justify-center gap-2 font-bold shadow-md"
-              >
-                Falar com a Equipe MakerPixel no WhatsApp
-              </a>
-              <button
-                type="button"
-                onClick={() => {
-                  const dados = {};
-                  for (let i = 0; i < localStorage.length; i++) {
-                    const k = localStorage.key(i);
-                    dados[k] = localStorage.getItem(k);
-                  }
-                  const blob = new Blob([JSON.stringify(dados, null, 2)], { type: "application/json" });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement("a");
-                  a.href = url;
-                  a.download = `backup-central-contabil-${new Date().toISOString().slice(0, 10)}.json`;
-                  a.click();
-                  URL.revokeObjectURL(url);
-                }}
-                className="btn-contorno h-10 text-xs font-semibold flex items-center justify-center gap-2"
-              >
-                📥 Exportar meus dados (Backup LGPD)
-              </button>
-              <button
-                type="button"
-                onClick={() => { definirEscritorioAtivo("esc-modelo"); window.location.reload(); }}
-                className="btn-fantasma text-xs text-muted"
-              >
-                Trocar para Escritório Ativo (Modo Demonstração)
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      <Suporte compacto={naModulo} contexto={() => ({
-        tela: (titulo.sub && titulo.sub !== titulo.titulo ? titulo.sub + " › " : "") + titulo.titulo,
-        usuario: usuario ? { nome: usuario.nome, email: usuario.email } : null, versao: VERSAO, sistema: "Central Contábil"
-      })} />
     </div>
   );
 }

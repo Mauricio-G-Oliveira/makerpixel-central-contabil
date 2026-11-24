@@ -1,9 +1,11 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import Icone from "../componentes/Icone.jsx";
 import Janela from "../componentes/Janela.jsx";
 import { Campo, Selo } from "../componentes/contabil/ui.jsx";
 import { useAvisos } from "../componentes/Avisos.jsx";
+import apiClient from "../lib/apiClient.mjs";
+import { CONFIG } from "../lib/config.js";
 import {
   listarEscritorios,
   escritorioAtivo,
@@ -32,7 +34,54 @@ export default function AdminMakerPixel() {
   const [versao, setVersao] = useState(0);
   const recarregar = () => setVersao((v) => v + 1);
 
-  const escritorios = useMemo(() => listarEscritorios(), [versao]);
+  const [escritoriosApi, setEscritoriosApi] = useState([]);
+  const [carregandoApi, setCarregandoApi] = useState(!CONFIG.modoDemo);
+
+  const carregarEscritorios = useCallback(async () => {
+    if (CONFIG.modoDemo) return;
+    setCarregandoApi(true);
+    try {
+      const lista = await apiClient.get("/api/admin/escritorios");
+      if (Array.isArray(lista)) {
+        setEscritoriosApi(
+          lista.map((e) => ({
+            id: e.id,
+            cnpj: e.cnpj,
+            razaoSocial: e.razaoSocial,
+            nomeFantasia: e.razaoSocial,
+            contato: e.contato,
+            email: e.email,
+            telefone: e.telefone,
+            cidade: e.cidade,
+            uf: e.uf,
+            situacao: e.situacao,
+            diasRestantes: e.diasRestantes,
+            expirado: e.expirado,
+            modulos: e.modulosAtivos || ["notasync", "reforma", "danfse", "xml-excel", "em-dia"],
+            limiteUsuarios: e.maxUsuarios || 5,
+            limiteEmpresas: e.maxEmpresas || 60,
+            criadoEm: e.criadoEm,
+          }))
+        );
+      }
+    } catch (err) {
+      aviso("Não foi possível carregar escritórios da API: " + (err.message || err), "aviso");
+    } finally {
+      setCarregandoApi(false);
+    }
+  }, [aviso]);
+
+  useEffect(() => {
+    carregarEscritorios();
+  }, [carregarEscritorios, versao]);
+
+  const escritorios = useMemo(() => {
+    if (!CONFIG.modoDemo && escritoriosApi.length > 0) {
+      return escritoriosApi;
+    }
+    return listarEscritorios();
+  }, [escritoriosApi, versao]);
+
   const ativo = useMemo(() => escritorioAtivo(), [versao]);
   const planos = useMemo(() => listarPlanos(), [versao]);
   const [filtro, setFiltro] = useState("TODOS");
@@ -112,7 +161,7 @@ export default function AdminMakerPixel() {
   }, [escritorios]);
 
   // Ações de formulário
-  const submeterNovoTeste = (e) => {
+  const submeterNovoTeste = async (e) => {
     e.preventDefault();
     if (!formTeste.nome.trim() || !formTeste.email.trim()) {
       aviso("Preencha o nome do escritório e o e-mail do responsável.", "erro");
@@ -120,6 +169,33 @@ export default function AdminMakerPixel() {
     }
     if (formTeste.dias > 90) {
       if (!window.confirm(`Você definiu um período de teste longo (${formTeste.dias} dias). Deseja confirmar?`)) {
+        return;
+      }
+    }
+    if (!CONFIG.modoDemo) {
+      try {
+        const resp = await apiClient.post("/api/admin/escritorios/teste", {
+          nome: formTeste.nome,
+          cnpj: formTeste.cnpj,
+          responsavel: formTeste.contato || formTeste.nome,
+          email: formTeste.email,
+          telefone: formTeste.telefone,
+          cidade: formTeste.cidade,
+          dias: Number(formTeste.dias) || 3,
+          carregarExemplos: formTeste.carregarDemo ?? true,
+        });
+        setModalNovoTeste(false);
+        setModalConvite({
+          escritorio: { razaoSocial: formTeste.nome, telefone: formTeste.telefone },
+          senha: resp.senhaProvisoria,
+          texto: resp.mensagemFormatada,
+          linkWhatsApp: resp.whatsappLink,
+        });
+        recarregar();
+        aviso("Acesso de teste criado com sucesso na nuvem!");
+        return;
+      } catch (err) {
+        aviso(err.message, "erro");
         return;
       }
     }
@@ -454,7 +530,18 @@ export default function AdminMakerPixel() {
                   {st.emTeste && (
                     <button
                       type="button"
-                      onClick={() => {
+                      onClick={async () => {
+                        if (!CONFIG.modoDemo) {
+                          try {
+                            await apiClient.post(`/api/admin/escritorios/${esc.id}/prorrogar`, { diasAdicionais: 7 });
+                            recarregar();
+                            aviso("Teste prorrogado por mais 7 dias na nuvem!");
+                            return;
+                          } catch (err) {
+                            aviso(err.message, "erro");
+                            return;
+                          }
+                        }
                         prorrogarTeste(esc.id, 7);
                         recarregar();
                         aviso("Teste prorrogado por mais 7 dias!");
@@ -525,7 +612,22 @@ export default function AdminMakerPixel() {
                   {st.situacaoEfetiva === "SUSPENSO" ? (
                     <button
                       type="button"
-                      onClick={() => { reativarEscritorio(esc.id); recarregar(); aviso("Escritório reativado!"); }}
+                      onClick={async () => {
+                        if (!CONFIG.modoDemo) {
+                          try {
+                            await apiClient.post(`/api/admin/escritorios/${esc.id}/reativar`);
+                            recarregar();
+                            aviso("Escritório reativado na nuvem!");
+                            return;
+                          } catch (err) {
+                            aviso(err.message, "erro");
+                            return;
+                          }
+                        }
+                        reativarEscritorio(esc.id);
+                        recarregar();
+                        aviso("Escritório reativado!");
+                      }}
                       className="btn-fantasma btn-sm text-xs text-credit"
                     >
                       Reativar
@@ -533,8 +635,19 @@ export default function AdminMakerPixel() {
                   ) : (
                     <button
                       type="button"
-                      onClick={() => {
+                      onClick={async () => {
                         if (window.confirm(`Deseja suspender o acesso do escritório ${esc.razaoSocial}?`)) {
+                          if (!CONFIG.modoDemo) {
+                            try {
+                              await apiClient.post(`/api/admin/escritorios/${esc.id}/suspender`);
+                              recarregar();
+                              aviso("Escritório suspenso na nuvem.");
+                              return;
+                            } catch (err) {
+                              aviso(err.message, "erro");
+                              return;
+                            }
+                          }
                           suspenderEscritorio(esc.id, "Suspensão administrativa");
                           recarregar();
                           aviso("Escritório suspenso.");

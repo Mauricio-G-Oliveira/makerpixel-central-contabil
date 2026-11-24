@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AuthCore } from "../lib/legado.js";
+import { AuthCore } from "../lib/authService.js";
 import { useAuth } from "../lib/auth.jsx";
 import { useAvisos } from "./Avisos.jsx";
 import Janela from "./Janela.jsx";

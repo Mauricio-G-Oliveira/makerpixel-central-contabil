@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { CONFIG, Suporte as S } from "../lib/legado.js";
+import { CONFIG } from "../lib/config.js";
+import { Suporte as S } from "../lib/suporte.js";
 import Icone from "./Icone.jsx";
 
 /** Botão flutuante de suporte: a mensagem para o WhatsApp já leva a tela, o usuário e a versão. */

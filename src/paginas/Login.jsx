@@ -1,16 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
-import { AuthCore } from "../lib/legado.js";
+import { AuthCore } from "../lib/authService.js";
 import { useAuth } from "../lib/auth.jsx";
 import { lerLocal, gravarLocal } from "../lib/tema.js";
 
 const RECURSOS = [
-  "Integração contábil e conciliação bancária",
-  "Distribuição de lucros, IRRF e REINF",
-  "Departamento Cadastro: empresas, certidões, alvarás e faturamento",
-  "Em Dia: o que cada setor fez no mês",
-  "Apuração de ICMS, auditor IBS/CBS e ISS Municipal",
-  "Controle de horas do Departamento Pessoal"
+  "NotaSync: Busca automática de DF-e e SEF/SC para contabilidade",
+  "Reforma Tributária: Auditor IBS/CBS e Calculadora RTC",
+  "DANFSe: Emissão e visualização de NFS-e direto no navegador",
+  "XML → Excel: Conversão e exportação rápida de documentos fiscais",
+  "Em Dia: Gestão diária de obrigações e tarefas do escritório"
 ];
 
 function CampoSenha({ id, value, onChange, autoComplete }) {
@@ -96,15 +95,15 @@ export default function Login() {
 
   const resetarAdmin = () => {
     if (window.confirm("Deseja redefinir os acessos de administrador neste computador e cadastrar uma nova senha?")) {
-      try { localStorage.removeItem("gf.sessao"); localStorage.removeItem("auth:usuarios"); } catch (e) {}
-      import("../lib/legado.js").then(({ Store }) => {
-        Store.del("auth:usuarios").then(() => {
-          setAviso("Acessos locais limpos. Digite 'Mauricio' e a sua nova senha.");
-          setTela("entrar");
-          setEmail("Mauricio");
-          setSenha("");
-        });
-      });
+      try {
+        localStorage.removeItem("gf.sessao");
+        localStorage.removeItem("auth:usuarios");
+        localStorage.removeItem("mp_auth_token");
+      } catch (e) {}
+      setAviso("Acessos locais limpos. Digite 'Mauricio' e a sua nova senha.");
+      setTela("entrar");
+      setEmail("Mauricio");
+      setSenha("");
     }
   };
 

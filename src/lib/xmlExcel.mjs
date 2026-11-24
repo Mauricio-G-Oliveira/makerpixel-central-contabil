@@ -2,7 +2,7 @@
  * xmlExcel.mjs — Conversor universal de XML (NF-e, NFC-e, NFS-e) e notas do NotaSync para Excel (XLSX).
  * Gera planilhas completas com abas separadas para "Notas Fiscais" e "Itens dos Produtos e Serviços".
  */
-import { arvore } from "./iss/leitor.mjs";
+import { arvore } from "./xmlParser.mjs";
 import { carregarXlsx } from "./leitores.js";
 
 function busca(el, nome) {

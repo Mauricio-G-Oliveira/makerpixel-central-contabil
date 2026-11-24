@@ -4,7 +4,7 @@
  * IBS-UF, IBS-Município e CBS. Mesmas regras do módulo antigo (public/modulos/auditor-ibs-cbs).
  * O XML é lido com o leitor tolerante do ISS (igual no navegador e nos testes). Testado em tests/ibsCbs.test.js.
  */
-import { arvore } from "./iss/leitor.mjs";
+import { arvore } from "./xmlParser.mjs";
 
 export const TOLERANCIA = 0.03;
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import Icone from "../componentes/Icone.jsx";
 import {
@@ -18,11 +18,12 @@ import CardCertificado from "../componentes/notasync/CardCertificado.jsx";
 import AssistentePrimeirosPassosModal from "../componentes/notasync/AssistentePrimeirosPassosModal.jsx";
 import ModalUploadCertificado from "../componentes/notasync/ModalUploadCertificado.jsx";
 import ModalImportarEmpresasCsv from "../componentes/notasync/ModalImportarEmpresasCsv.jsx";
+import apiClient from "../lib/apiClient.mjs";
+import { CONFIG } from "../lib/config.js";
 
 const STORAGE_KEY_NOTASYNC = "notasync:documentos_v3";
 const STORAGE_KEY_EXECUCOES = "notasync:execucoes_v3";
 const STORAGE_KEY_EMPRESAS = "notasync:empresas_v3";
-const STORAGE_KEY_CERTIFICADO = "notasync:certificado_v3";
 
 const fmtMoeda = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const fmtDataHora = (iso) => {
@@ -48,93 +49,158 @@ export default function NotaSync() {
   const [copiado, setCopiado] = useState("");
   const [sincronizandoGeral, setSincronizandoGeral] = useState(false);
   const [buscandoCnpj, setBuscandoCnpj] = useState("");
+  const [carregandoApi, setCarregandoApi] = useState(!CONFIG.modoDemo);
 
   // Modais
   const [modalAssistenteAberta, setModalAssistenteAberta] = useState(false);
   const [modalUploadCertAberta, setModalUploadCertAberta] = useState(false);
   const [modalImportarCsvAberta, setModalImportarCsvAberta] = useState(false);
 
-  // Estado do Certificado Digital A1 no Cofre
+  // Estado do Certificado Digital A1 no Cofre (sempre mantido em memória)
   const [certificado, setCertificado] = useState(() => {
-    try {
-      const salvo = localStorage.getItem(STORAGE_KEY_CERTIFICADO);
-      if (salvo) return JSON.parse(salvo);
-    } catch (e) {}
-    return {
-      titular: "CONTABILIDADE MODELO LTDA",
-      documento: "11222333000181",
-      tipo: "E_CNPJ",
-      emissor: "AC Certisign Multipla G7",
-      validoDe: "2026-01-10T00:00:00Z",
-      validoAte: "2027-01-10T23:59:59Z",
-      sha256Original: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      termoVersao: "1.0",
-      versaoChaveMestra: 1,
-    };
+    if (CONFIG.modoDemo) {
+      return {
+        titular: "CONTABILIDADE MODELO LTDA",
+        documento: "11222333000181",
+        tipo: "E_CNPJ",
+        emissor: "AC Certisign Multipla G7",
+        validoDe: "2026-01-10T00:00:00Z",
+        validoAte: "2027-01-10T23:59:59Z",
+        sha256Original: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        termoVersao: "1.0",
+        versaoChaveMestra: 1,
+      };
+    }
+    return null;
   });
 
   // Empresas monitoradas
   const [empresas, setEmpresas] = useState(() => {
-    try {
-      const salvo = localStorage.getItem(STORAGE_KEY_EMPRESAS);
-      if (salvo) return JSON.parse(salvo);
-    } catch (e) {}
-    const sementes = gerarSementesNfceDemo();
-    return sementes.empresas.map((emp) => ({
-      ...emp,
-      ativo: true,
-      ultNsu: 520,
-      proximaBusca: null, // Disponível imediatamente
-      status: emp.id === "emp-4" ? "PENDENTE_VINCULO_SAT" : "SINCRONIZADO",
-    }));
+    if (CONFIG.modoDemo) {
+      try {
+        const salvo = localStorage.getItem(STORAGE_KEY_EMPRESAS);
+        if (salvo) return JSON.parse(salvo);
+      } catch (e) {}
+      const sementes = gerarSementesNfceDemo();
+      return sementes.empresas.map((emp) => ({
+        ...emp,
+        ativo: true,
+        ultNsu: 520,
+        proximaBusca: null,
+        status: emp.id === "emp-4" ? "PENDENTE_VINCULO_SAT" : "SINCRONIZADO",
+      }));
+    }
+    return [];
   });
 
   // Documentos NFC-e
   const [documentos, setDocumentos] = useState(() => {
-    try {
-      const salvo = localStorage.getItem(STORAGE_KEY_NOTASYNC);
-      if (salvo) return JSON.parse(salvo);
-    } catch (e) {}
-    return gerarSementesNfceDemo().documentos;
+    if (CONFIG.modoDemo) {
+      try {
+        const salvo = localStorage.getItem(STORAGE_KEY_NOTASYNC);
+        if (salvo) return JSON.parse(salvo);
+      } catch (e) {}
+      return gerarSementesNfceDemo().documentos;
+    }
+    return [];
   });
 
   // Histórico de Execuções
   const [execucoes, setExecucoes] = useState(() => {
-    try {
-      const salvo = localStorage.getItem(STORAGE_KEY_EXECUCOES);
-      if (salvo) return JSON.parse(salvo);
-    } catch (e) {}
-    return gerarSementesNfceDemo().execucoes;
+    if (CONFIG.modoDemo) {
+      try {
+        const salvo = localStorage.getItem(STORAGE_KEY_EXECUCOES);
+        if (salvo) return JSON.parse(salvo);
+      } catch (e) {}
+      return gerarSementesNfceDemo().execucoes;
+    }
+    return [];
   });
 
-  // Persistência Local
+  // Carregar dados reais da API quando em produção
+  const carregarDadosApi = useCallback(async () => {
+    if (CONFIG.modoDemo) return;
+    setCarregandoApi(true);
+    try {
+      const [certRes, empRes, docRes, execRes] = await Promise.allSettled([
+        apiClient.get("/api/v1/certificados/ativo"),
+        apiClient.get("/api/v1/notasync/empresas"),
+        apiClient.get("/api/v1/notasync/documentos?size=100"),
+        apiClient.get("/api/v1/notasync/execucoes"),
+      ]);
+
+      if (certRes.status === "fulfilled" && certRes.value) {
+        setCertificado(certRes.value);
+      } else {
+        setCertificado(null);
+      }
+
+      if (empRes.status === "fulfilled" && Array.isArray(empRes.value)) {
+        setEmpresas(
+          empRes.value.map((e) => ({
+            id: e.id,
+            cnpj: e.cnpj,
+            razaoSocial: e.razaoSocial,
+            ativo: e.ativo !== false,
+            ultNsu: e.ultNsu || 0,
+            proximaBusca: e.proximaConsulta || null,
+            status: e.ultimoCstat === 8002 ? "PENDENTE_VINCULO_SAT" : "SINCRONIZADO",
+          }))
+        );
+      }
+
+      if (docRes.status === "fulfilled" && docRes.value) {
+        const lista = Array.isArray(docRes.value)
+          ? docRes.value
+          : (docRes.value.content || []);
+        setDocumentos(lista);
+      }
+
+      if (execRes.status === "fulfilled" && Array.isArray(execRes.value)) {
+        setExecucoes(
+          execRes.value.map((x) => ({
+            id: x.id || String(Math.random()),
+            empresaNome: x.empresaNome || x.cnpj,
+            cStat: x.cstat || x.cStat,
+            xMotivo: x.xmotivo || x.xMotivo,
+            dataHora: x.executadoEm || x.dataHora,
+            duracaoMs: x.duracaoMs || 0,
+            qtd: x.documentosNovos || x.qtdDocumentos || 0,
+          }))
+        );
+      }
+    } catch (err) {
+      aviso("Não foi possível carregar dados da API: " + (err.message || err), "erro");
+    } finally {
+      setCarregandoApi(false);
+    }
+  }, [aviso]);
+
   useEffect(() => {
+    carregarDadosApi();
+  }, [carregarDadosApi]);
+
+  // Persistência Local exclusiva do modo demonstração
+  useEffect(() => {
+    if (!CONFIG.modoDemo) return;
     try {
       localStorage.setItem(STORAGE_KEY_NOTASYNC, JSON.stringify(documentos));
     } catch (e) {}
   }, [documentos]);
 
   useEffect(() => {
+    if (!CONFIG.modoDemo) return;
     try {
       localStorage.setItem(STORAGE_KEY_EXECUCOES, JSON.stringify(execucoes));
     } catch (e) {}
   }, [execucoes]);
 
   useEffect(() => {
+    if (!CONFIG.modoDemo) return;
     try {
       localStorage.setItem(STORAGE_KEY_EMPRESAS, JSON.stringify(empresas));
     } catch (e) {}
   }, [empresas]);
-
-  useEffect(() => {
-    try {
-      if (certificado) {
-        localStorage.setItem(STORAGE_KEY_CERTIFICADO, JSON.stringify(certificado));
-      } else {
-        localStorage.removeItem(STORAGE_KEY_CERTIFICADO);
-      }
-    } catch (e) {}
-  }, [certificado]);
 
   // Métricas para cards do topo
   const metricas = useMemo(() => {
@@ -203,8 +269,24 @@ export default function NotaSync() {
     aviso("Relatório CSV de NFC-e gerado com sucesso.");
   };
 
-  // Baixar arquivo ZIP com todos os XMLs do mês (Fase 4 & Fase 5)
-  const baixarZipMes = (cnpjAlvo = null) => {
+  // Baixar arquivo ZIP com todos os XMLs do mês
+  const baixarZipMes = async (cnpjAlvo = null) => {
+    const anoMes = new Date().toISOString().slice(0, 7);
+    if (!CONFIG.modoDemo && cnpjAlvo) {
+      try {
+        const cnpjLimpo = cnpjAlvo.replace(/\D/g, "");
+        const nomeArquivo = `nfce_${cnpjLimpo}_${anoMes}.zip`;
+        await apiClient.downloadStream(
+          `/api/v1/notasync/empresas/${cnpjLimpo}/mes/${anoMes}/zip`,
+          nomeArquivo
+        );
+        aviso(`Download do arquivo ZIP iniciado via nuvem.`);
+        return;
+      } catch (err) {
+        aviso(`Aviso da API: ${err.message}. Gerando arquivo no navegador...`, "aviso");
+      }
+    }
+
     const notasParaZip = notasFiltradas.filter((d) => !cnpjAlvo || d.cnpjEmitente === cnpjAlvo);
     if (notasParaZip.length === 0) {
       aviso("Nenhuma nota fiscal encontrada para gerar o arquivo ZIP.");
@@ -231,7 +313,7 @@ export default function NotaSync() {
     const a = document.createElement("a");
     a.href = url;
     const nomeEmpresa = cnpjAlvo ? cnpjAlvo : "lote_completo";
-    a.download = `nfce_${nomeEmpresa}_2026-11.zip`;
+    a.download = `nfce_${nomeEmpresa}_${anoMes}.zip`;
     a.click();
     URL.revokeObjectURL(url);
 
@@ -239,7 +321,7 @@ export default function NotaSync() {
   };
 
   // Buscar Agora para empresa específica com controle de HTTP 429
-  const buscarAgoraEmpresa = (empresa) => {
+  const buscarAgoraEmpresa = async (empresa) => {
     const checagem = verificarEsperaBuscaAgora(empresa.proximaBusca);
     if (!checagem.podeConsultar) {
       const min = Math.ceil(checagem.segundosRestantes / 60);
@@ -251,6 +333,36 @@ export default function NotaSync() {
     }
 
     setBuscandoCnpj(empresa.cnpj);
+
+    if (!CONFIG.modoDemo) {
+      try {
+        const resp = await apiClient.post(
+          `/api/v1/notasync/buscar-agora/${empresa.cnpj.replace(/\D/g, "")}`
+        );
+        setEmpresas((lista) =>
+          lista.map((e) =>
+            e.id === empresa.id
+              ? {
+                  ...e,
+                  proximaBusca:
+                    resp.proximaConsulta ||
+                    new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString(),
+                  status: resp.cstat === 8002 ? "PENDENTE_VINCULO_SAT" : "SINCRONIZADO",
+                  ultNsu: resp.ultNsu || e.ultNsu,
+                }
+              : e
+          )
+        );
+        aviso(resp.motivo || `Busca concluída para ${empresa.razaoSocial || empresa.nome}.`);
+        carregarDadosApi();
+      } catch (err) {
+        aviso(err.message || "Erro ao consultar SEF/SC.", "aviso");
+      } finally {
+        setBuscandoCnpj("");
+      }
+      return;
+    }
+
     setTimeout(() => {
       setBuscandoCnpj("");
 
@@ -258,7 +370,11 @@ export default function NotaSync() {
       if (empresa.cnpj.includes("666") || empresa.id === "emp-4") {
         const novaProxima = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
         setEmpresas((lista) =>
-          lista.map((e) => (e.id === empresa.id ? { ...e, proximaBusca: novaProxima, status: "PENDENTE_VINCULO_SAT" } : e))
+          lista.map((e) =>
+            e.id === empresa.id
+              ? { ...e, proximaBusca: novaProxima, status: "PENDENTE_VINCULO_SAT" }
+              : e
+          )
         );
         aviso(
           `SEF/SC Retorno 8002: O contador não está vinculado ao CNPJ ${empresa.cnpj} no SAT da SEF/SC. Aguardando 24h.`,
@@ -268,22 +384,63 @@ export default function NotaSync() {
         // Sucesso 118
         const novaProxima = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString();
         setEmpresas((lista) =>
-          lista.map((e) => (e.id === empresa.id ? { ...e, proximaBusca: novaProxima, status: "SINCRONIZADO" } : e))
+          lista.map((e) =>
+            e.id === empresa.id
+              ? { ...e, proximaBusca: novaProxima, status: "SINCRONIZADO" }
+              : e
+          )
         );
         aviso(`Busca concluída para ${empresa.razaoSocial || empresa.nome}. Fila sincronizada com sucesso!`);
       }
     }, 1200);
   };
 
-  const toggleAtivoEmpresa = (id) => {
+  const toggleAtivoEmpresa = async (id) => {
+    if (!CONFIG.modoDemo) {
+      try {
+        const atualizada = await apiClient.patch(`/api/v1/notasync/empresas/${id}/toggle-ativo`);
+        setEmpresas((lista) =>
+          lista.map((e) => (e.id === id ? { ...e, ativo: atualizada?.ativo ?? !e.ativo } : e))
+        );
+        aviso("Status da empresa atualizado.");
+        return;
+      } catch (err) {
+        aviso("Erro ao alterar ativação: " + (err.message || err), "erro");
+        return;
+      }
+    }
     setEmpresas((lista) =>
       lista.map((e) => (e.id === id ? { ...e, ativo: !e.ativo } : e))
     );
     aviso("Status da empresa atualizado.");
   };
 
-  const simularSincronizacaoGeral = () => {
+  const excluirCertificado = async () => {
+    if (!CONFIG.modoDemo && certificado?.id) {
+      try {
+        await apiClient.del(`/api/v1/certificados/${certificado.id}`);
+      } catch (err) {
+        aviso("Erro ao excluir certificado: " + (err.message || err), "erro");
+        return;
+      }
+    }
+    setCertificado(null);
+    aviso("Certificado digital A1 excluído com sucesso do cofre.");
+  };
+
+  const simularSincronizacaoGeral = async () => {
     setSincronizandoGeral(true);
+    if (!CONFIG.modoDemo) {
+      try {
+        await carregarDadosApi();
+        aviso("Dados de sincronização atualizados diretamente da nuvem.");
+      } catch (err) {
+        aviso("Erro ao sincronizar: " + (err.message || err), "erro");
+      } finally {
+        setSincronizandoGeral(false);
+      }
+      return;
+    }
     setTimeout(() => {
       setSincronizandoGeral(false);
       aviso("Busca automática SEF/SC concluída. 4 empresas sincronizadas (1 requer atenção no SAT).");
@@ -308,6 +465,18 @@ export default function NotaSync() {
 
   return (
     <div className="space-y-6">
+      {CONFIG.modoDemo && (
+        <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 text-xs font-semibold flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span>⚠️</span>
+            <span>Modo Demonstração: dados simulados em memória. Para operar em produção, configure VITE_MODO_DEMO=false e conecte à API.</span>
+          </div>
+          <span className="text-[11px] uppercase tracking-wider font-bold bg-amber-200 dark:bg-amber-900 px-2 py-0.5 rounded">
+            Demonstração
+          </span>
+        </div>
+      )}
+
       {/* Cabeçalho */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-line">
         <div>
@@ -387,25 +556,24 @@ export default function NotaSync() {
             Gerar DANFSe
           </Link>
 
-          <button
-            type="button"
-            onClick={restaurarDemo}
-            className="btn-contorno text-xs text-muted hover:text-ink py-1.5 px-2.5"
-            title="Restaurar sementes de teste do GitHub Pages"
-          >
-            Demo
-          </button>
+          {CONFIG.modoDemo && (
+            <button
+              type="button"
+              onClick={restaurarDemo}
+              className="btn-contorno text-xs text-muted hover:text-ink py-1.5 px-2.5"
+              title="Restaurar sementes de teste do GitHub Pages"
+            >
+              Demo
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Card do Certificado Digital A1 no Cofre (Fase 3 & 5) */}
+      {/* Card do Certificado Digital A1 no Cofre */}
       <CardCertificado
         certificado={certificado}
         onTrocar={() => setModalUploadCertAberta(true)}
-        onExcluir={() => {
-          setCertificado(null);
-          aviso("Certificado digital A1 excluído com sucesso do cofre.");
-        }}
+        onExcluir={excluirCertificado}
         onAbrirAssistente={() => setModalAssistenteAberta(true)}
       />
 
@@ -950,7 +1118,21 @@ export default function NotaSync() {
       <ModalImportarEmpresasCsv
         aberta={modalImportarCsvAberta}
         aoFechar={() => setModalImportarCsvAberta(false)}
-        onAdicionarEmpresas={(novas) => {
+        onAdicionarEmpresas={async (novas) => {
+          if (!CONFIG.modoDemo) {
+            for (const n of novas) {
+              try {
+                await apiClient.post("/api/v1/notasync/empresas", {
+                  cnpj: n.cnpj,
+                  razaoSocial: n.razaoSocial || n.nome,
+                });
+              } catch (err) {
+                aviso(`Erro ao cadastrar ${n.cnpj}: ${err.message}`, "erro");
+              }
+            }
+            await carregarDadosApi();
+            return;
+          }
           setEmpresas((prev) => {
             const mapa = new Map(prev.map((e) => [e.cnpj, e]));
             for (const n of novas) {

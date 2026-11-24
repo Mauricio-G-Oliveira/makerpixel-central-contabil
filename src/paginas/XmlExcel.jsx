@@ -10,6 +10,8 @@ import { xmlsDeExemplo } from "../lib/ibsCbs.mjs";
 import { carregarJsZip } from "../lib/leitores.js";
 import { useAvisos } from "../componentes/Avisos.jsx";
 import Icone from "../componentes/Icone.jsx";
+import apiClient from "../lib/apiClient.mjs";
+import { CONFIG } from "../lib/config.js";
 
 const CHAVE_NOTASYNC_DOCS = "notasync:documentos_v3";
 const fmtMoeda = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
@@ -106,7 +108,32 @@ export default function XmlExcel() {
   }
 
   // Importa notas diretamente do NotaSync
-  function importarDoNotaSync() {
+  async function importarDoNotaSync() {
+    setCarregando(true);
+    if (!CONFIG.modoDemo) {
+      try {
+        const docs = await apiClient.get("/api/v1/notasync/documentos?size=100");
+        const listaDocs = Array.isArray(docs) ? docs : docs?.content || [];
+        if (listaDocs.length > 0) {
+          const xmlsNotaSync = listaDocs.map((d) => {
+            const xml = `<?xml version="1.0" encoding="UTF-8"?><nfeProc versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><NFe><infNFe Id="NFe${d.chave || d.chaveAcesso}"><ide><mod>65</mod><serie>${d.serie || 1}</serie><nNF>${d.numero || 1}</nNF><dhEmi>${d.dataEmissao || new Date().toISOString()}</dhEmi></ide><emit><CNPJ>${d.cnpjEmitente || ""}</CNPJ><xNome>${d.empresaNome || "Empresa"}</xNome></emit><total><ICMSTot><vNF>${Number(d.valorTotal || 0).toFixed(2)}</vNF></ICMSTot></total></infNFe></NFe></nfeProc>`;
+            return {
+              nome: `NFCe_${d.numero || d.chave || "nota"}.xml`,
+              texto: xml,
+            };
+          });
+          const listaTotal = [...arquivos, ...xmlsNotaSync];
+          setArquivos(listaTotal);
+          const res = processarLoteXml(listaTotal);
+          setDadosProcessados(res);
+          aviso(`${xmlsNotaSync.length} documento(s) carregados da API NotaSync.`);
+          setCarregando(false);
+          return;
+        }
+      } catch (err) {
+        aviso(`Aviso da API (${err.message}). Buscando dados locais...`, "aviso");
+      }
+    }
     try {
       const salvo = localStorage.getItem(CHAVE_NOTASYNC_DOCS);
       if (!salvo) {
@@ -121,17 +148,13 @@ export default function XmlExcel() {
 
       const xmlsNotaSync = [];
       for (const d of docs) {
-        if (d.xml) {
-          xmlsNotaSync.push({
-            nome: `${d.modelo || "DOC"}_${d.numero || d.chave || "nota"}.xml`,
-            texto: d.xml
-          });
-        }
-      }
-
-      if (xmlsNotaSync.length === 0) {
-        aviso("Os documentos no NotaSync não possuem conteúdo XML gravado.");
-        return;
+        const texto =
+          d.xml ||
+          `<?xml version="1.0" encoding="UTF-8"?><nfeProc versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><NFe><infNFe Id="NFe${d.chave}"><ide><mod>65</mod><serie>${d.serie || 1}</serie><nNF>${d.numero || 1}</nNF><dhEmi>${d.dataEmissao || new Date().toISOString()}</dhEmi></ide><emit><CNPJ>${d.cnpjEmitente || ""}</CNPJ><xNome>${d.empresaNome || "Empresa"}</xNome></emit><total><ICMSTot><vNF>${Number(d.valorTotal || 0).toFixed(2)}</vNF></ICMSTot></total></infNFe></NFe></nfeProc>`;
+        xmlsNotaSync.push({
+          nome: `${d.modelo || "DOC"}_${d.numero || d.chave || "nota"}.xml`,
+          texto,
+        });
       }
 
       const listaTotal = [...arquivos, ...xmlsNotaSync];
@@ -141,6 +164,8 @@ export default function XmlExcel() {
       aviso(`${xmlsNotaSync.length} documento(s) importado(s) do NotaSync.`);
     } catch (e) {
       aviso("Erro ao importar do NotaSync: " + e.message);
+    } finally {
+      setCarregando(false);
     }
   }
 

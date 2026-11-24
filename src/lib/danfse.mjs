@@ -6,7 +6,7 @@
  * Contrato oficial com cmd/danfse-wasm/main.go:
  * window.danfseWasm.gerarPdf(JSON.stringify({ xml, stc, canhoto })) -> { pdf: "<base64>", size: <int> }
  */
-import { arvore } from "./iss/leitor.mjs";
+import { arvore } from "./xmlParser.mjs";
 import { criarZipBlob } from "./notasync.mjs";
 
 export const MAX_XML_SIZE = 5 * 1024 * 1024; // 5 MB

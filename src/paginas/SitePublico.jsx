@@ -78,7 +78,7 @@ export default function SitePublico() {
             </div>
             <div>
               <span className="text-lg font-bold tracking-tight text-white flex items-center gap-1.5">
-                Central Contábil <span className="text-xs px-2 py-0.5 rounded-full bg-brand/20 text-brand font-semibold">v3.0</span>
+                Central Contábil <span className="text-xs px-2 py-0.5 rounded-full bg-brand/20 text-brand font-semibold">v4.0</span>
               </span>
               <span className="text-xs text-slate-400 block -mt-0.5 font-mono">makerpixeltech.com.br</span>
             </div>
@@ -219,25 +219,25 @@ export default function SitePublico() {
               </p>
             </div>
 
-            {/* Card 5: Conciliação Inteligente */}
+            {/* Card 5: Em Dia */}
             <div className="p-8 rounded-2xl bg-slate-800/80 border border-slate-700/80 hover:border-emerald-500/50 transition shadow-lg">
               <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center mb-6">
-                <Icone nome="conciliacao" className="w-6 h-6" />
+                <Icone nome="emdia" className="w-6 h-6" />
               </div>
-              <h3 className="text-xl font-bold text-white mb-2">Conciliação Bancária com IA</h3>
+              <h3 className="text-xl font-bold text-white mb-2">Em Dia — Gestão de Obrigações</h3>
               <p className="text-slate-400 text-sm leading-relaxed">
-                Casamento automatizado de extratos (Banco do Brasil, Itaú, Nubank, Unicred, etc.) com faturamentos e contas a pagar com regras de tolerância e lote.
+                O que cada empresa precisa no mês, quem é o responsável e o status de cada tarefa com alertas automáticos de certificados e notas fiscais.
               </p>
             </div>
 
-            {/* Card 6: Departamento Cadastro & Em Dia */}
+            {/* Card 6: Gestão Multi-Escritório */}
             <div className="p-8 rounded-2xl bg-slate-800/80 border border-slate-700/80 hover:border-emerald-500/50 transition shadow-lg">
               <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center mb-6">
-                <Icone nome="check" className="w-6 h-6" />
+                <Icone nome="empresa" className="w-6 h-6" />
               </div>
-              <h3 className="text-xl font-bold text-white mb-2">Obrigações & Alvarás em Dia</h3>
+              <h3 className="text-xl font-bold text-white mb-2">Multi-Escritório & Equipe</h3>
               <p className="text-slate-400 text-sm leading-relaxed">
-                Alertas prévios de certidões, vencimento de licenças e alvarás, faturamento anual para enquadramento do Simples Nacional, Lucros e REINF.
+                Ambiente seguro com permissões por módulo, controle de limites do plano e painel administrativo MakerPixel para contabilidades modernas.
               </p>
             </div>
           </div>

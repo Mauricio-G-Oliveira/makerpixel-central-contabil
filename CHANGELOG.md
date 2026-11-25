@@ -4,6 +4,28 @@ Todas as modificações e melhorias relevantes da plataforma são registradas ne
 
 ---
 
+## [4.1.0] - 2026-11-25
+
+### 🚀 Central Contábil v4.1: Auditoria Contínua & Integração SIEG
+
+#### Área "Auditoria Contínua" no Módulo Reforma
+- **Painel do Mês com Semáforo Inteligente:** Visão consolidada por empresa com semáforo visual baseado em limites unificados (`CONFIG_SEMAFORO`):
+  - 🟢 **Verde:** todos os itens auditados e em conformidade fiscal (0 divergências).
+  - 🟡 **Amarelo:** poucas divergências leves (1 a 5 itens).
+  - 🔴 **Vermelho:** divergências elevadas (> 5 itens) ou notas sem grupo IBS/CBS emitidas no ERP.
+  - ⚪ **Cinza:** sem notas ou pendências no mês.
+- **Resumo "Desde ontem":** Indicador em tempo real de notas novas conferidas nas últimas 24h e novas divergências detectadas.
+- **Drill-down com 1 Clique:** Ao clicar na linha da empresa, transição imediata para a conferência detalhada de itens com comparativo lado a lado, memória de cálculo e exportação CSV.
+- **Gatilhos sob Demanda:** Botões *"Conferir pendentes agora"* e *"Reconferir o mês"* com confirmação de usuário.
+
+#### Integração SIEG (NF-e 55 & CT-e 57)
+- **Gestão Segura de Chave de API:** Configuração da credencial da SIEG criptografada diretamente no cofre AES-256-GCM do escritório.
+- **Exibição Mascarada:** A chave de API nunca é exposta em texto puro (exibindo apenas os últimos 4 caracteres).
+- **Testes e Troca:** Botão *"Testar Conexão"* e gestão simplificada da integração.
+- **Suporte Total ao Modo Demonstração:** Operação 100% autônoma e offline em ambiente de teste com dados representativos.
+
+---
+
 ## [4.0.0] - 2026-11-24
 
 ### 🚀 Central Contábil v4: Produto Enxuto, Conexão à API, Em Dia Reescrito e Pronto para Piloto

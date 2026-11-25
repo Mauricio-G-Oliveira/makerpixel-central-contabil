@@ -22,6 +22,8 @@ import { carregarXlsx, carregarJsZip } from "../lib/leitores.js";
 import { useAvisos } from "../componentes/Avisos.jsx";
 import { Campo, Selo } from "../componentes/contabil/ui.jsx";
 import ModalComparativoReforma from "../componentes/reforma/ModalComparativoReforma.jsx";
+import PainelAuditoriaContinua from "../componentes/reforma/PainelAuditoriaContinua.jsx";
+import IntegracaoSieg from "../componentes/reforma/IntegracaoSieg.jsx";
 import apiClient from "../lib/apiClient.mjs";
 import { CONFIG } from "../lib/config.js";
 
@@ -32,7 +34,8 @@ const CHAVE_NOTASYNC_EMPRESAS = "notasync:empresas_v3";
 
 export default function IbsCbs() {
   const { aviso } = useAvisos();
-  const [aba, setAba] = useState("conferencia"); // conferencia | consulta | calc | ref | lotes
+  const [aba, setAba] = useState("continua"); // continua | conferencia | consulta | calc | ref | lotes | sieg
+  const [empresaContinuaAtiva, setEmpresaContinuaAtiva] = useState(null);
 
   // Versão da Calculadora RTC da Receita Federal
   const [versaoRtc, setVersaoRtc] = useState("Calculadora RTC v1.4.2 (Transição 2026)");
@@ -415,6 +418,71 @@ export default function IbsCbs() {
     });
   }, [itensAuditados, filtroSituacao, busca]);
 
+  const abrirEmpresaContinua = async (emp) => {
+    setEmpresaContinuaAtiva(emp);
+    setEmpresaSelecionada(emp.empresaId || emp.cnpj);
+
+    if (!CONFIG.modoDemo && emp.loteId) {
+      try {
+        setCarregando(true);
+        const res = await apiClient.get(`/api/v1/reforma/conferir/lotes/${emp.loteId}/itens`);
+        const lista = res?.content || (Array.isArray(res) ? res : []);
+        if (lista.length > 0) {
+          setItensAuditados(lista.map((it) => ({
+            id: it.id,
+            doc: it.numeroNota ? `NF-e ${it.numeroNota}` : it.chaveNfe?.slice(25, 34) || "Doc",
+            nfNumber: it.numeroNota,
+            chaveNfe: it.chaveNfe,
+            empresaNome: emp.razaoSocial,
+            nItem: it.nItem,
+            cProd: it.codigoProduto,
+            desc: it.descricao,
+            ncm: it.ncm,
+            cfop: it.cfop,
+            vProd: it.valorItem,
+            bc: it.baseCalculo,
+            cstInformado: it.cstInformado,
+            cClassTribInformado: it.cClassTrib,
+            cbsDestacada: it.cbsDestacado,
+            ibsUfDestacado: it.ibsUfDestacado,
+            ibsMunDestacado: it.ibsMunDestacado,
+            totDestacado: (it.cbsDestacado || 0) + (it.ibsUfDestacado || 0) + (it.ibsMunDestacado || 0),
+            cstOficial: it.cstCalculado,
+            cClassTribOficial: it.cClassTrib,
+            reducaoOficial: 0,
+            cbsCalculada: it.cbsCalculado,
+            ibsUfCalculado: it.ibsUfCalculado,
+            ibsMunCalculado: it.ibsMunCalculado,
+            totOficial: (it.cbsCalculado || 0) + (it.ibsUfCalculado || 0) + (it.ibsMunCalculado || 0),
+            difTotal: it.diferencaTotal,
+            classificacao: it.classificacao,
+            motivoDivergencia: it.motivoDivergencia,
+            acaoRecomendada: it.classificacao === "OK" ? "Nenhuma ação necessária" : "Ajustar cadastro tributário no ERP",
+            memoriaCalculo: it.memoriaCalculo,
+            fundamentacaoLegal: it.fundamentacaoLegal,
+            enquadramentoValido: it.classificacao !== "ENQUADRAMENTO_INVALIDO"
+          })));
+          setLoteAtualId(emp.loteId);
+          setAba("conferencia");
+          aviso(`Itens da empresa ${emp.razaoSocial} abertos para conferência detalhada.`);
+          return;
+        }
+      } catch (e) {
+      } finally {
+        setCarregando(false);
+      }
+    }
+
+    // Modo demonstração ou fallback
+    const demo = gerarLoteReformaDemo();
+    setItensAuditados(demo.map((it) => ({
+      ...auditarItemReforma(it, referencia),
+      empresaNome: emp.razaoSocial
+    })));
+    setAba("conferencia");
+    aviso(`Itens auditados de ${emp.razaoSocial} abertos para conferência.`);
+  };
+
   return (
     <div className="space-y-4">
       {/* Aviso Legal Fixo de 2026 */}
@@ -436,11 +504,13 @@ export default function IbsCbs() {
       {/* Navegação entre Abas */}
       <div className="inline-flex flex-wrap rounded-lg border border-line bg-surface p-0.5" role="tablist">
         {[
-          ["conferencia", "Conferência em Lote"],
+          ["continua", "Auditoria Contínua (Diária)"],
+          ["conferencia", "Conferência Manual (Lote / Upload)"],
           ["consulta", "Consulta Reforma (cClassTrib & NCM)"],
           ["calc", "Calculadora Avulsa"],
           ["ref", "Tabela CST (SVRS)"],
-          ["lotes", `Lotes Salvos (${lotesSalvos.length})`]
+          ["lotes", `Lotes Salvos (${lotesSalvos.length})`],
+          ["sieg", "Integração SIEG"]
         ].map(([id, nome]) => (
           <button
             key={id}
@@ -455,9 +525,38 @@ export default function IbsCbs() {
         ))}
       </div>
 
+      {/* ABA 0: AUDITORIA CONTÍNUA (DIÁRIA) */}
+      {aba === "continua" && (
+        <PainelAuditoriaContinua
+          aoAbrirEmpresa={abrirEmpresaContinua}
+          aoAbrirSieg={() => setAba("sieg")}
+        />
+      )}
+
       {/* ABA 1: CONFERÊNCIA EM LOTE */}
       {aba === "conferencia" && (
         <div className="space-y-4">
+          {/* Alerta de Empresa Ativa vinda da Auditoria Contínua */}
+          {empresaContinuaAtiva && (
+            <div className="bg-brand-soft border border-brand/20 p-3 rounded-lg flex items-center justify-between gap-3 text-[13px]">
+              <div>
+                <span className="text-muted block text-[11px] uppercase font-bold">Detalhamento da Empresa</span>
+                <strong className="text-brand font-semibold text-[14.5px]">{empresaContinuaAtiva.razaoSocial}</strong>
+                <span className="text-muted font-mono ml-2 text-[12px]">({empresaContinuaAtiva.cnpj})</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setEmpresaContinuaAtiva(null);
+                  setAba("continua");
+                }}
+                className="botao-secundario text-[12px] px-3 py-1.5 bg-surface shadow-sm hover:text-brand"
+              >
+                ← Voltar à Auditoria Contínua
+              </button>
+            </div>
+          )}
+
           {/* Seletor de Origem e Ações Rápidas */}
           <section className="cartao p-4 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
@@ -798,6 +897,11 @@ export default function IbsCbs() {
           onCarregarLote={(l) => { setItensAuditados(l.itens); setAba("conferencia"); aviso("Lote reaberto na conferência."); }}
           onExcluirLote={(id) => { setLotesSalvos(lotesSalvos.filter((l) => l.id !== id)); aviso("Lote excluído do histórico."); }}
         />
+      )}
+
+      {/* ABA 6: INTEGRAÇÃO SIEG */}
+      {aba === "sieg" && (
+        <IntegracaoSieg aoAtualizar={() => {}} />
       )}
 
       {/* Modal Lado a Lado: Destacado vs Oficial */}

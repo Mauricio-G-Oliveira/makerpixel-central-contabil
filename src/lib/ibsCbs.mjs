@@ -775,3 +775,134 @@ export function exportarDivergenciasCsv(itensAuditados, nomeLote = "reforma_dive
 
   return "\uFEFF" + linhas.join("\r\n");
 }
+
+/**
+ * Objeto único de configuração dos limites do semáforo da Auditoria Contínua.
+ */
+export const CONFIG_SEMAFORO = {
+  limiteVerdeDivergencias: 0,
+  limiteAmareloDivergencias: 5, // 1 a 5 divergências = amarelo; > 5 = vermelho
+  bloqueiaSemGrupoIbsCbs: true, // Qualquer nota sem grupo IBS/CBS ativa semáforo vermelho
+  bloqueiaErrosCalculo: true
+};
+
+/**
+ * Determina o semáforo da empresa no mês:
+ * 🟢 VERDE: auditado e sem divergências
+ * 🟡 AMARELO: 1 a 5 divergências leves
+ * 🔴 VERMELHO: > 5 divergências, ou nota sem grupo IBS/CBS, ou erro
+ * ⚪ CINZA: nenhuma nota auditada nem pendente
+ */
+export function calcularSemaforo(empresa, config = CONFIG_SEMAFORO) {
+  if (!empresa) return "CINZA";
+  const { totalNotas = 0, totalPendentes = 0, totalDivergencias = 0, totalSemGrupo = 0, totalErros = 0 } = empresa;
+  if (totalNotas === 0 && totalPendentes === 0) return "CINZA";
+  if ((config.bloqueiaSemGrupoIbsCbs && totalSemGrupo > 0) ||
+      (config.bloqueiaErrosCalculo && totalErros > 0) ||
+      totalDivergencias > config.limiteAmareloDivergencias) {
+    return "VERMELHO";
+  }
+  if (totalDivergencias > config.limiteVerdeDivergencias) {
+    return "AMARELO";
+  }
+  return "VERDE";
+}
+
+/**
+ * Gera sementes de demonstração representativas do painel de Auditoria Contínua
+ */
+export function gerarPainelContinuaDemo(anoMes = "2026-02") {
+  return {
+    anoMes,
+    empresas: [
+      {
+        empresaId: "emp-demo-1",
+        cnpj: "11.222.333/0001-81",
+        razaoSocial: "Supermercado Catarinense Ltda",
+        semaforo: "VERDE",
+        totalNotas: 142,
+        totalItens: 480,
+        totalOk: 480,
+        totalDivergencias: 0,
+        totalSemGrupo: 0,
+        totalErros: 0,
+        totalPendentes: 0,
+        loteId: "lote-demo-1"
+      },
+      {
+        empresaId: "emp-demo-2",
+        cnpj: "22.333.444/0001-92",
+        razaoSocial: "Móveis & Eletro do Vale S.A.",
+        semaforo: "AMARELO",
+        totalNotas: 85,
+        totalItens: 210,
+        totalOk: 207,
+        totalDivergencias: 3,
+        totalSemGrupo: 0,
+        totalErros: 0,
+        totalPendentes: 2,
+        loteId: "lote-demo-2"
+      },
+      {
+        empresaId: "emp-demo-3",
+        cnpj: "33.444.555/0001-03",
+        razaoSocial: "Farmácia & Drogaria Sul Ltda",
+        semaforo: "VERMELHO",
+        totalNotas: 60,
+        totalItens: 180,
+        totalOk: 168,
+        totalDivergencias: 12,
+        totalSemGrupo: 2,
+        totalErros: 0,
+        totalPendentes: 0,
+        loteId: "lote-demo-3"
+      },
+      {
+        empresaId: "emp-demo-4",
+        cnpj: "44.555.666/0001-14",
+        razaoSocial: "Metalúrgica Tubarão Indústria e Comércio",
+        semaforo: "CINZA",
+        totalNotas: 0,
+        totalItens: 0,
+        totalOk: 0,
+        totalDivergencias: 0,
+        totalSemGrupo: 0,
+        totalErros: 0,
+        totalPendentes: 0,
+        loteId: null
+      }
+    ],
+    desdeOntem: {
+      notasConferidas: 38,
+      divergenciasNovas: 2
+    },
+    statusFontes: {
+      sef: {
+        status: "OK",
+        ultimaBusca: "Hoje às 06:00",
+        cstat: 138,
+        motivo: "Documento localizado para o destinatário"
+      },
+      sieg: {
+        configurada: true,
+        ultimosQuatro: "9876",
+        status: "CONEXAO_OK",
+        ultimaBusca: "Hoje às 06:15",
+        ultimoErro: null
+      }
+    },
+    versaoCalculadora: {
+      versaoMotor: "v1.4.2-rfb",
+      versaoRegras: "LC-214-2025",
+      status: "ONLINE",
+      ambiente: "Nuvem",
+      dataAtualizacao: "2026-02-15",
+      mensagem: "Calculadora RTC oficial conectada"
+    },
+    limitePlano: {
+      utilizado: 287,
+      limiteMensal: 5000,
+      aviso: "Dentro do limite contratado (287/5.000 documentos este mês)"
+    }
+  };
+}

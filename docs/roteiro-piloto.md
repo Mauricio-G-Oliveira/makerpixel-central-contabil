@@ -9,3 +9,4 @@ Consulte o documento completo em [makerpixel-gestao-api/docs/roteiro-piloto.md](
 4. **Download ZIP & Auditoria IBS/CBS:** download em streaming do arquivo ZIP do mês e envio direto para o auditor da Reforma Tributária com exportação Excel.
 5. **Em Dia Reescrito:** geração idempotente do mês e verificação de tarefas automáticas (erro SAT 8002, vencimento de certificado e divergências da Reforma).
 6. **Suspensão e LGPD:** teste de bloqueio pelo admin e exportação/exclusão de dados em conformidade com a LGPD.
+7. **Auditoria Contínua & SIEG (v4.1.0):** entrada contínua de notas fiscais, painel com semáforo por empresa (verde, amarelo e vermelho), resumo "desde ontem", reconferência do mês sob demanda e criação de tarefas no Em Dia.

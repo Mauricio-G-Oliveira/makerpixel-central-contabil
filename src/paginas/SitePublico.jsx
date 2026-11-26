@@ -13,7 +13,7 @@ export default function SitePublico() {
     escritorio: "",
     email: "",
     whatsapp: "",
-    cidade: "Tubarão",
+    cidade: "Florianópolis",
     uf: "SC",
     qtdEmpresas: "10 a 50",
     planoInteresse: "plano-escritorio"
@@ -157,7 +157,7 @@ export default function SitePublico() {
             </div>
             <div className="flex items-center gap-2">
               <Icone nome="check" className="w-4 h-4 text-emerald-400" />
-              Suporte humanizado em Tubarão e SC
+              Suporte humanizado em Santa Catarina e Brasil
             </div>
           </div>
         </div>
@@ -419,7 +419,7 @@ export default function SitePublico() {
                     <div className="grid grid-cols-3 gap-2">
                       <input
                         type="text"
-                        placeholder="Tubarão"
+                        placeholder="Florianópolis"
                         value={form.cidade}
                         onChange={(e) => setForm({ ...form, cidade: e.target.value })}
                         className="col-span-2 px-3.5 py-2.5 rounded-xl bg-slate-950/60 border border-slate-700 text-white text-sm focus:outline-none focus:border-brand"
@@ -477,7 +477,7 @@ export default function SitePublico() {
               Tecnologia e Automação Contábil &copy; {new Date().getFullYear()} — Todos os direitos reservados.
             </p>
             <p className="text-[11px] text-slate-400 mt-1 font-mono">
-              Domínio Oficial: <a href="https://makerpixeltech.com.br" className="text-emerald-400 hover:underline">makerpixeltech.com.br</a> • Tubarão - Santa Catarina
+              Domínio Oficial: <a href="https://makerpixeltech.com.br" className="text-emerald-400 hover:underline">makerpixeltech.com.br</a> • Santa Catarina - Brasil
             </p>
           </div>
 

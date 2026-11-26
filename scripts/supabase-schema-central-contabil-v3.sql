@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS mp_escritorios (
   contato VARCHAR(150),
   email VARCHAR(255) NOT NULL,
   telefone VARCHAR(50),
-  cidade VARCHAR(100) DEFAULT 'Tubarão',
+  cidade VARCHAR(100) DEFAULT 'Florianópolis',
   uf VARCHAR(2) DEFAULT 'SC',
   situacao VARCHAR(30) NOT NULL DEFAULT 'TESTE', -- TESTE, ATIVO, VENCIDO, SUSPENSO, ENCERRADO
   plano_id VARCHAR(50) REFERENCES mp_planos(id) DEFAULT 'plano-escritorio',
@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS mp_empresas (
   regime_tributario VARCHAR(50) DEFAULT 'SIMPLES_NACIONAL',
   inscricao_estadual VARCHAR(50),
   inscricao_municipal VARCHAR(50),
-  cidade VARCHAR(100) DEFAULT 'Tubarão',
+  cidade VARCHAR(100) DEFAULT 'Florianópolis',
   uf VARCHAR(2) DEFAULT 'SC',
   ativo BOOLEAN DEFAULT true,
   monitoramento_notasync BOOLEAN DEFAULT true,

@@ -11,7 +11,7 @@ export const CONFIG = {
   modoTeste: false,
   apiUrl: env.VITE_API_URL || "",
   modoDemo: env.VITE_MODO_DEMO === "true",
-  versao: "4.0.0",
+  versao: "4.1.1",
   suporte: {
     nome: "Mauricio",
     papel: "TI · desenvolvimento do sistema",

@@ -23,8 +23,8 @@ export default function IntegracaoSieg({ aoAtualizar }) {
           ultimosQuatro: "9876",
           configuradaEm: "15/02/2026 10:30",
           ultimaBusca: "Hoje às 06:15",
-          ultimoStatus: "CONEXAO_OK",
-          ultimoErro: null
+          ultimoStatus: "EM_PREPARACAO",
+          ultimoErro: "Aguardando documentação oficial da API SIEG."
         });
         return;
       }
@@ -63,12 +63,12 @@ export default function IntegracaoSieg({ aoAtualizar }) {
           ultimosQuatro: ult,
           configuradaEm: "Hoje agora",
           ultimaBusca: null,
-          ultimoStatus: "CONFIGURADA",
-          ultimoErro: null
+          ultimoStatus: "EM_PREPARACAO",
+          ultimoErro: "Integração em homologação: aguardando documentação oficial."
         });
         setApiKeyInput("");
         setEditando(false);
-        aviso("Chave da SIEG criptografada e salva com sucesso no cofre (modo demonstração).");
+        aviso("Chave da SIEG criptografada e salva no cofre (status: Em Preparação).");
         if (aoAtualizar) aoAtualizar();
         return;
       }
@@ -77,7 +77,7 @@ export default function IntegracaoSieg({ aoAtualizar }) {
       setConfig(res);
       setApiKeyInput("");
       setEditando(false);
-      aviso("Chave da SIEG criptografada no cofre AES-256-GCM com sucesso!");
+      aviso("Chave da SIEG criptografada no cofre AES-256-GCM. Status: Em Preparação.");
       if (aoAtualizar) aoAtualizar();
     } catch (err) {
       aviso("Erro ao salvar chave da SIEG: " + (err.message || err));
@@ -90,20 +90,20 @@ export default function IntegracaoSieg({ aoAtualizar }) {
     try {
       setTestando(true);
       if (CONFIG.modoDemo) {
-        await new Promise((r) => setTimeout(r, 600));
-        aviso("Conexão com a SIEG testada com sucesso! Credencial válida e autenticada.");
+        await new Promise((r) => setTimeout(r, 400));
+        aviso("Integração SIEG em preparação: aguardando documentação oficial da API.");
         return;
       }
 
       const res = await apiClient.post("/api/v1/integracoes/sieg/testar");
       if (res?.sucesso) {
-        aviso(res.mensagem || "Conexão com a API da SIEG autenticada com sucesso!");
-        carregarConfig();
+        aviso(res.mensagem || "Conexão testada.");
       } else {
-        aviso("Falha no teste da SIEG: " + (res?.mensagem || "Rejeição"));
+        aviso(res?.mensagem || "Integração SIEG em preparação: aguardando documentação oficial da API.");
       }
+      carregarConfig();
     } catch (err) {
-      aviso("Erro ao testar conexão SIEG: " + (err.message || err));
+      aviso("Status da integração SIEG: " + (err.message || err));
     } finally {
       setTestando(false);
     }
@@ -147,23 +147,25 @@ export default function IntegracaoSieg({ aoAtualizar }) {
     <div className="cartao p-5 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-lg bg-brand-soft text-brand flex items-center justify-center font-bold text-[14px]">
+          <div className="w-9 h-9 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold text-[14px]">
             SIEG
           </div>
           <div>
             <h3 className="text-[15px] font-semibold text-ink">Integração SIEG (NF-e 55 & CT-e 57)</h3>
             <p className="text-[12.5px] text-muted">
-              Baixa contínua e automática dos documentos fiscais emitida contra suas empresas, sem digitação manual.
+              Baixa contínua e automática dos documentos fiscais emitida contra suas empresas.
             </p>
           </div>
         </div>
 
-        {config?.configurada && !editando && (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-medium bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
-            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-            Conectada (final ****{config.ultimosQuatro})
-          </span>
-        )}
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-medium bg-amber-500/10 text-amber-700 border border-amber-500/20">
+          <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+          Em preparação (Aguardando documentação oficial)
+        </span>
+      </div>
+
+      <div className="bg-sky-500/10 border border-sky-500/20 p-3 rounded-lg text-[12.5px] text-sky-800 leading-relaxed">
+        <strong>Status da Integração:</strong> A integração automática com a SIEG está em fase final de homologação técnica. O salvamento de chaves no cofre criptografado AES-256-GCM já está disponível, e a coleta automática será ativada assim que a documentação oficial da API for disponibilizada.
       </div>
 
       {config?.configurada && !editando ? (
@@ -175,22 +177,16 @@ export default function IntegracaoSieg({ aoAtualizar }) {
               <p className="text-[11px] text-muted mt-0.5">Criptografia AES-256-GCM</p>
             </div>
             <div>
-              <span className="text-muted block text-[11.5px] uppercase font-medium">Configurada Em</span>
-              <span className="text-ink font-medium">{config.configuradaEm || "—"}</span>
-              <p className="text-[11px] text-muted mt-0.5">Vínculo do escritório</p>
+              <span className="text-muted block text-[11.5px] uppercase font-medium">Status</span>
+              <span className="text-amber-700 font-medium">Em Preparação</span>
+              <p className="text-[11px] text-muted mt-0.5">Homologação</p>
             </div>
             <div>
-              <span className="text-muted block text-[11.5px] uppercase font-medium">Última Sincronização</span>
-              <span className="text-ink font-medium">{config.ultimaBusca || "Aguardando próximo ciclo"}</span>
-              <p className="text-[11px] text-muted mt-0.5">Status: {config.ultimoStatus || "OK"}</p>
+              <span className="text-muted block text-[11.5px] uppercase font-medium">Observação</span>
+              <span className="text-ink font-medium text-[12px]">Aguardando doc. oficial API</span>
+              <p className="text-[11px] text-muted mt-0.5">Sem chamadas fictícias</p>
             </div>
           </div>
-
-          {config.ultimoErro && (
-            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-md text-[12.5px] text-red-600">
-              <strong>Atenção:</strong> {config.ultimoErro}
-            </div>
-          )}
 
           <div className="flex flex-wrap items-center gap-2 pt-1">
             <button
@@ -200,7 +196,7 @@ export default function IntegracaoSieg({ aoAtualizar }) {
               className="botao-secundario text-[13px] inline-flex items-center gap-1.5 px-3 py-1.5"
             >
               <Icone nome="raio" className="w-3.5 h-3.5" />
-              {testando ? "Testando Conexão..." : "Testar Conexão"}
+              {testando ? "Verificando..." : "Verificar Status da Integração"}
             </button>
 
             <button
@@ -225,10 +221,6 @@ export default function IntegracaoSieg({ aoAtualizar }) {
         </div>
       ) : (
         <form onSubmit={salvarChave} className="space-y-4">
-          <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-lg text-[12.5px] text-amber-700 leading-relaxed">
-            <strong>Segurança do Cofre:</strong> Informe a chave de API fornecida no portal da SIEG. A chave será imediatamente encifrada com AES-256-GCM e nunca retornará em texto puro para a tela nem para logs.
-          </div>
-
           <div className="space-y-1.5">
             <label className="block text-[13px] font-semibold text-ink">
               Chave de API da SIEG (API Key)
@@ -243,7 +235,7 @@ export default function IntegracaoSieg({ aoAtualizar }) {
               className="campo w-full font-mono text-[13px]"
             />
             <span className="text-[11.5px] text-muted">
-              Você encontra essa chave no painel da SIEG em Configurações &gt; Chaves de API / Integrações.
+              A chave informada será armazenada de forma segura com AES-256-GCM no cofre do escritório.
             </span>
           </div>
 
@@ -254,7 +246,7 @@ export default function IntegracaoSieg({ aoAtualizar }) {
               className="botao-primario text-[13px] inline-flex items-center gap-1.5 px-4 py-2"
             >
               <Icone nome="salvar" className="w-4 h-4" />
-              {salvando ? "Criptografando e Salvando..." : "Salvar no Cofre"}
+              {salvando ? "Criptografando e Salvando..." : "Salvar Chave no Cofre"}
             </button>
 
             {config?.configurada && (

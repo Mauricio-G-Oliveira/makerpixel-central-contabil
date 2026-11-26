@@ -12,7 +12,7 @@ describe("DANFSe — Parser de XML de NFS-e", () => {
     assert.ok(res.dados);
     assert.equal(res.dados.numero, "3021");
     assert.equal(res.dados.prestador.cnpjCpf, "11222333000181");
-    assert.equal(res.dados.prestador.municipio, "Tubarão");
+    assert.equal(res.dados.prestador.municipio, "Florianópolis");
     assert.equal(res.dados.tomador.cnpjCpf, "22333444000192");
     assert.equal(res.dados.servico.valorServicos, 2500);
     assert.equal(res.dados.servico.aliquotaIss, 3);

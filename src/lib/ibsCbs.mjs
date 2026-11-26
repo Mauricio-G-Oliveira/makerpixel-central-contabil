@@ -641,7 +641,7 @@ export function gerarLoteReformaDemo() {
       doc: "NF-e 8840",
       nfNumber: "8840",
       chaveNfe: "42260144555666000180550010000088401000088403",
-      empresaNome: "Ferragens & Ferramentas Tubarão Ltda",
+      empresaNome: "Ferragens & Ferramentas Catarinense Ltda",
       dataEmissao: "2026-02-22T08:20:00Z",
       nItem: 1,
       cProd: "PAR-8X50",
@@ -860,7 +860,7 @@ export function gerarPainelContinuaDemo(anoMes = "2026-02") {
       {
         empresaId: "emp-demo-4",
         cnpj: "44.555.666/0001-14",
-        razaoSocial: "Metalúrgica Tubarão Indústria e Comércio",
+        razaoSocial: "Metalúrgica Catarinense Indústria e Comércio",
         semaforo: "CINZA",
         totalNotas: 0,
         totalItens: 0,

@@ -4,6 +4,22 @@ Todas as modificações e melhorias relevantes da plataforma são registradas ne
 
 ---
 
+## [4.1.1] - 2026-11-26
+
+### 🛡️ Central Contábil v4.1.1: Correções Pré-Deploy & Publicação Demo GitHub Pages
+
+#### Integração SIEG Transparente e Honesta
+- **Badge e Status Honesto:** Status visual explícito *"Em preparação (Aguardando documentação oficial)"* sem mensagens enganosas de conexão bem-sucedida.
+- **Armazenamento Seguro:** Salvamento no cofre criptografado com status `EM_PREPARACAO` até a liberação das especificações oficiais da API da SIEG.
+
+#### Limpeza e Publicação da Demonstração (GitHub Pages)
+- **Eliminação de Build Antigo:** Remoção de arquivos compilados legados da pasta `docs/` (`assets/`, `index.html`, `manifest.webmanifest`, `sw.js`), mantendo a integridade de guias e manuais de implantação.
+- **Purga de Cache PWA:** Atualização do Service Worker para limpar agressivamente caches desatualizados e sincronizar versões na primeira ativação.
+- **Automação CI/CD GitHub Actions:** Criação do workflow `.github/workflows/deploy-demo.yml` para compilar e publicar automaticamente com `VITE_MODO_DEMO=true` a cada push na `main`.
+- **Padronização e Neutralidade de Dados:** Substituição de nomes de cidades de teste por nomenclaturas estaduais e regionais em seeds, testes e páginas públicas.
+
+---
+
 ## [4.1.0] - 2026-11-25
 
 ### 🚀 Central Contábil v4.1: Auditoria Contínua & Integração SIEG

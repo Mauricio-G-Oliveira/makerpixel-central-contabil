@@ -110,7 +110,7 @@ describe("consultaCnpj.mjs", async () => {
     const dadosReceita = {
       nome: "RAZAO SOCIAL DA RECEITA SA",
       fantasia: "NOME FANTASIA RECEITA",
-      cidade: "Tubarão",
+      cidade: "Florianópolis",
       uf: "SC",
       cep: "88700000",
       telefone: "(48) 3622-0000",
@@ -133,7 +133,7 @@ describe("consultaCnpj.mjs", async () => {
 
     // Campos vazios devem ser preenchidos
     assert.equal(mesclado.fantasia, "NOME FANTASIA RECEITA");
-    assert.equal(mesclado.cidade, "Tubarão");
+    assert.equal(mesclado.cidade, "Florianópolis");
     assert.equal(mesclado.uf, "SC");
     assert.equal(mesclado.cep, "88700000");
 

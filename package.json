@@ -1,6 +1,6 @@
 {
   "name": "makerpixel-central-contabil",
-  "version": "2.0.0",
+  "version": "4.1.1",
   "private": true,
   "description": "Central Contábil by MakerPixel — Plataforma SaaS de Gestão Contábil, Inteligência Fiscal e Busca Automatizada de NFC-e (React + Tailwind)",
   "scripts": {

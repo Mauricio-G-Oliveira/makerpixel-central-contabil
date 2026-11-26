@@ -22,6 +22,6 @@ Aqui está com total transparência o que você já encontra 100% operacional no
 📌 *O que está no nosso roadmap com entrega contínua:*
 Estamos trabalhando na expansão da busca automática para NF-e/CT-e em outros estados e na integração do módulo Simples Nacional assim que a Receita Federal disponibilizar as tabelas públicas complementares.
 
-Conheça os planos e solicite uma demonstração gratuita de 7 dias para o seu escritório em: **makerpixeltech.com.br** ou fale diretamente com a nossa equipe em Tubarão/SC!
+Conheça os planos e solicite uma demonstração gratuita de 7 dias para o seu escritório em: **makerpixeltech.com.br** ou fale diretamente com a nossa equipe em Santa Catarina!
 
 #Contabilidade #TecnologiaContabil #ReformaTributaria #NotaSync #SEFSC #MakerPixelTech #InovacaoFiscal

@@ -84,7 +84,7 @@ export function lerXmlNfse(xmlTexto, nomeArquivo = "nfse.xml") {
   const imPrestador = texto(emit, "im") || texto(emit, "inscricaomunicipal") || "12345";
   const endPrestador = texto(emit, "xlgr") || "Avenida Central";
   const nroPrestador = texto(emit, "nro") || "100";
-  const munPrestador = texto(emit, "xmun") || "Tubarão";
+  const munPrestador = texto(emit, "xmun") || "Florianópolis";
   const ufPrestador = texto(emit, "uf") || "SC";
   const cepPrestador = texto(emit, "cep") || "88701000";
 
@@ -463,9 +463,9 @@ export function xmlNfseDeExemplo() {
       <xFant>Central Contábil MakerPixel</xFant>
       <IM>987654</IM>
       <enderPrestador>
-        <xLgr>Rua Coronel Cabral</xLgr>
+        <xLgr>Rua Central</xLgr>
         <nro>150</nro>
-        <xMun>Tubarão</xMun>
+        <xMun>Florianópolis</xMun>
         <UF>SC</UF>
         <CEP>88701000</CEP>
       </enderPrestador>
@@ -474,9 +474,9 @@ export function xmlNfseDeExemplo() {
       <CNPJ>22333444000192</CNPJ>
       <xNome>COMÉRCIO & SERVIÇOS SUL LTDA</xNome>
       <enderTomador>
-        <xLgr>Avenida Marcolino Martins Cabral</xLgr>
+        <xLgr>Avenida Central</xLgr>
         <nro>1200</nro>
-        <xMun>Tubarão</xMun>
+        <xMun>Florianópolis</xMun>
         <UF>SC</UF>
       </enderTomador>
       <email>financeiro@sulservicos.com.br</email>

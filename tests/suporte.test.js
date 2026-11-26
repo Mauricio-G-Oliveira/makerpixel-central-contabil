@@ -36,3 +36,12 @@ test("número legível", () => {
 test("o número configurado é válido", () => {
   assert.match(CONFIG.suporte.whatsapp, /^55\d{10,11}$/);
 });
+
+test("Suporte.jsx importa corretamente todos os hooks do React utilizados", async () => {
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const conteudo = fs.readFileSync(path.resolve("src/componentes/Suporte.jsx"), "utf-8");
+  assert.match(conteudo, /import\s+{[^}]*\buseState\b[^}]*}\s+from\s+["']react["']/);
+  assert.match(conteudo, /import\s+{[^}]*\buseEffect\b[^}]*}\s+from\s+["']react["']/);
+  assert.match(conteudo, /import\s+{[^}]*\buseRef\b[^}]*}\s+from\s+["']react["']/);
+});

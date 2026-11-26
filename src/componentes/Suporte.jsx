@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef } from "react";
 import { CONFIG } from "../lib/config.js";
 import { Suporte as S } from "../lib/suporte.js";
 import Icone from "./Icone.jsx";
